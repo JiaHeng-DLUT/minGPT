@@ -8,13 +8,13 @@ GPT model:
 """
 
 import math
-import logging
+import random
+from turtle import position
 
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
-logger = logging.getLogger(__name__)
 
 class GPTConfig:
     """ base GPT config, params common to all GPT versions """
@@ -22,8 +22,7 @@ class GPTConfig:
     resid_pdrop = 0.1
     attn_pdrop = 0.1
 
-    def __init__(self, vocab_size, block_size, **kwargs):
-        self.vocab_size = vocab_size
+    def __init__(self, block_size, **kwargs):
         self.block_size = block_size
         for k,v in kwargs.items():
             setattr(self, k, v)
@@ -105,19 +104,23 @@ class GPT(nn.Module):
         super().__init__()
 
         # input embedding stem
-        self.tok_emb = nn.Embedding(config.vocab_size, config.n_embd)
+        self.config = config
+        self.tok_emb = nn.Linear(config.input_dim, config.n_embd)
         self.pos_emb = nn.Parameter(torch.zeros(1, config.block_size, config.n_embd))
         self.drop = nn.Dropout(config.embd_pdrop)
         # transformer
         self.blocks = nn.Sequential(*[Block(config) for _ in range(config.n_layer)])
         # decoder head
         self.ln_f = nn.LayerNorm(config.n_embd)
-        self.head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
+        self.proj = nn.Linear(config.n_embd, config.output_dim)
+        self.head1 = nn.Linear(config.output_dim, 2, bias=False)
+        self.head2 = nn.Linear(config.output_dim, 2, bias=False)
+        self.head3 = nn.Linear(config.output_dim, 2, bias=False)
 
         self.block_size = config.block_size
         self.apply(self._init_weights)
 
-        logger.info("number of parameters: %e", sum(p.numel() for p in self.parameters()))
+        print("number of parameters: %e" % sum(p.numel() for p in self.parameters()))
 
     def get_block_size(self):
         return self.block_size
@@ -177,21 +180,43 @@ class GPT(nn.Module):
         optimizer = torch.optim.AdamW(optim_groups, lr=train_config.learning_rate, betas=train_config.betas)
         return optimizer
 
-    def forward(self, idx, targets=None):
-        b, t = idx.size()
+    def forward(self, x, pos, y=None):
+        b = x.shape[0]
+        t = x.shape[1]
         assert t <= self.block_size, "Cannot forward, model block size is exhausted."
 
         # forward the GPT model
-        token_embeddings = self.tok_emb(idx) # each index maps to a (learnable) vector
-        position_embeddings = self.pos_emb[:, :t, :] # each position maps to a (learnable) vector
+        token_embeddings = self.tok_emb(x)
+        position_embeddings = []
+        for i in range(b):
+            position_embeddings.append(self.pos_emb[:, pos[i] : pos[i] + self.config.num_tokens, :])
+        position_embeddings = torch.cat(position_embeddings, dim=0)
+        
         x = self.drop(token_embeddings + position_embeddings)
         x = self.blocks(x)
         x = self.ln_f(x)
-        logits = self.head(x)
+        x = self.proj(x)        #(b, num_tokens, output_dim)
 
-        # if we are given some desired targets also calculate the loss
-        loss = None
-        if targets is not None:
-            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
+        if y is None:
+            return x
 
-        return logits, loss
+        logits1 = self.head1(x).view(-1, 2) #(b * num_tokens, 2)
+        logits2 = self.head2(x).view(-1, 2)
+        logits3 = self.head3(x).view(-1, 2)
+        label1 = y[:, 0].reshape(-1)
+        label2 = y[:, 1].reshape(-1)
+        label3 = y[:, 2].reshape(-1)
+        loss1 = F.cross_entropy(logits1, label1, ignore_index=-100)
+        loss2 = F.cross_entropy(logits2, label2, ignore_index=-100)
+        loss3 = F.cross_entropy(logits3, label3, ignore_index=-100)
+
+        num_right = []
+        num_valid = []
+        num_right.append(torch.count_nonzero(torch.argmax(logits1, dim=1) == label1).item())
+        num_valid.append(torch.count_nonzero(label1 >= 0).item())
+        num_right.append(torch.count_nonzero(torch.argmax(logits2, dim=1) == label2).item())
+        num_valid.append(torch.count_nonzero(label2 >= 0).item())
+        num_right.append(torch.count_nonzero(torch.argmax(logits3, dim=1) == label3).item())
+        num_valid.append(torch.count_nonzero(label3 >= 0).item())
+
+        return x, loss1, loss2, loss3, num_right, num_valid
