@@ -43,7 +43,7 @@ class TrainerConfig:
 
     # optimization parameters
     max_epochs = 100
-    learning_rate = 5e-4
+    learning_rate = 2e-3
     betas = (0.9, 0.95)
     grad_norm_clip = 1.0
     weight_decay = 0.1 # only applied on matmul weights
