@@ -31,12 +31,20 @@ class FlyDataset(data.Dataset):
         else:
             labels = None
         pos = index % self.num_repeat * self.num_frame
-        return {
-            'keypoints': keypoints[pos : pos + self.num_frame],
-            'labels': labels[:, pos : pos + self.num_frame],
-            'pos': pos,
-            'id': id,
-        }
+        
+        if labels is None:
+            return {
+                'keypoints': keypoints[pos : pos + self.num_frame],
+                'pos': pos,
+                'id': id,
+            }
+        else:
+            return {
+                'keypoints': keypoints[pos : pos + self.num_frame],
+                'labels': labels[:, pos : pos + self.num_frame],
+                'pos': pos,
+                'id': id,
+            }
 
     def __len__(self):
         return len(self.id_list) * self.num_repeat
