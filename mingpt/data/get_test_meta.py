@@ -1,14 +1,19 @@
 import numpy as np
+from tqdm import tqdm
 
 
-data_path = '../../Fruit_Fly_Groups/Notebooks/data/submission_data.npy'
-submission_data = np.load(data_path, allow_pickle=True).item()
-seqs = submission_data['sequences']
-id_list = list(seqs.keys())
+data_path = '../../Fruit_Fly_Groups/Notebooks/data/frame_number_map.npy'
+frame_number_map = np.load(data_path, allow_pickle=True).item()
+id_list = list(frame_number_map.keys())
 n = len(id_list)
 print(n)
-id_list.sort()
 f = open(f'meta_info/meta_info_test.txt', 'w')
-for id in id_list:
+i = 0
+for id in tqdm(id_list):
     f.write(f'{id}\n')
+    print(frame_number_map[id])
+    (st, ed) = frame_number_map[id]
+    if st != i:
+        assert(0)
+    i += 4500
 f.close()
