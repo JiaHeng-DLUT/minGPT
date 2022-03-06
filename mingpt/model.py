@@ -187,12 +187,13 @@ class GPT(nn.Module):
 
         # forward the GPT model
         token_embeddings = self.tok_emb(x)
-        position_embeddings = []
-        for i in range(b):
-            position_embeddings.append(self.pos_emb[:, pos[i] : pos[i] + self.config.num_tokens, :])
-        position_embeddings = torch.cat(position_embeddings, dim=0)
+        # position_embeddings = []
+        # for i in range(b):
+        #     position_embeddings.append(self.pos_emb[:, pos[i] : pos[i] + self.config.num_tokens, :])
+        # position_embeddings = torch.cat(position_embeddings, dim=0)
         
-        x = self.drop(token_embeddings + position_embeddings)
+        # x = self.drop(token_embeddings + position_embeddings)
+        x = token_embeddings
         x = self.blocks(x)
         x = self.ln_f(x)
         x = self.proj(x)        #(b, num_tokens, output_dim)
