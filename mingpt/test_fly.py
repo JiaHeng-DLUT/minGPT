@@ -35,6 +35,7 @@ class TesterConfig:
 
     # checkpoint setting
     ckpt_path = f'./experiments/fly/01_max_epoch_100/epoch1.pth'
+    # ckpt_path = f'./experiments/fly/07_lr_1e-3/epoch2.pth'
     feat_path = ckpt_path.replace('.pth', '_submission.npy')
     # CUDA_VISIBLE_DEVICES=0 python test_fly.py
 
@@ -94,6 +95,7 @@ def validate_submission(submission, submission_clips):
 class Tester:
 
     def __init__(self, model, test_dataset, config):
+        model.load_state_dict(torch.load(config.ckpt_path))
         self.model = model
         self.test_dataset = test_dataset
         self.config = config
@@ -109,6 +111,7 @@ class Tester:
 
         is_train = False
         model.train(is_train)
+        model.eval()
         data = self.test_dataset
         loader = DataLoader(data, shuffle=False, pin_memory=True,
                             batch_size=config.batch_size,
