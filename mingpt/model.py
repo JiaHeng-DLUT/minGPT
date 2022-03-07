@@ -210,13 +210,23 @@ class GPT(nn.Module):
         loss2 = F.cross_entropy(logits2, label2, ignore_index=-100)
         loss3 = F.cross_entropy(logits3, label3, ignore_index=-100)
 
-        num_right = []
-        num_valid = []
-        num_right.append(torch.count_nonzero(torch.argmax(logits1, dim=1) == label1).item())
-        num_valid.append(torch.count_nonzero(label1 >= 0).item())
-        num_right.append(torch.count_nonzero(torch.argmax(logits2, dim=1) == label2).item())
-        num_valid.append(torch.count_nonzero(label2 >= 0).item())
-        num_right.append(torch.count_nonzero(torch.argmax(logits3, dim=1) == label3).item())
-        num_valid.append(torch.count_nonzero(label3 >= 0).item())
-
-        return x, loss1, loss2, loss3, num_right, num_valid
+        tp = []
+        fn = []
+        fp = []
+        tn = []
+        pred = torch.argmax(logits1, dim=1)
+        tp.append(((label1 == 1) & (pred == 1)).sum().item())
+        fn.append(((label1 == 1) & (pred == 0)).sum().item())
+        fp.append(((label1 == 0) & (pred == 1)).sum().item())
+        tn.append(((label1 == 0) & (pred == 0)).sum().item())
+        pred = torch.argmax(logits2, dim=1)
+        tp.append(((label2 == 1) & (pred == 1)).sum().item())
+        fn.append(((label2 == 1) & (pred == 0)).sum().item())
+        fp.append(((label2 == 0) & (pred == 1)).sum().item())
+        tn.append(((label2 == 0) & (pred == 0)).sum().item())
+        pred = torch.argmax(logits3, dim=1)
+        tp.append(((label3 == 1) & (pred == 1)).sum().item())
+        fn.append(((label3 == 1) & (pred == 0)).sum().item())
+        fp.append(((label3 == 0) & (pred == 1)).sum().item())
+        tn.append(((label3 == 0) & (pred == 0)).sum().item())
+        return x, loss1, loss2, loss3, tp, fn, fp, tn
