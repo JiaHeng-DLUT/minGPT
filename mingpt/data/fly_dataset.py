@@ -120,19 +120,34 @@ class FlyNormDataset(data.Dataset):
 
 if __name__ == '__main__':
     # train
-    train_dataset = {
-        'data_path': '../../Fruit_Fly_Groups/Notebooks/data/user_train.npy',
-        'meta_path': 'meta_info/meta_info_train_0.txt',
-        'num_frame': 150,
-        'total_frame': 4500,
-    }
-    dataset = FlyNormDataset(train_dataset)
-    dataloader = data.DataLoader(dataset, batch_size=1, shuffle=False)
-    for i, data in enumerate(dataloader):
-        print(i)
-
-    # val
-    # dataset = FlyDataset(opt['datasets']['val'])
+    # train_dataset = {
+    #     'data_path': '../../Fruit_Fly_Groups/Notebooks/data/user_train.npy',
+    #     'meta_path': 'meta_info/meta_info_train_0.txt',
+    #     'num_frame': 150,
+    #     'total_frame': 4500,
+    # }
+    # dataset = FlyNormDataset(train_dataset)
     # dataloader = data.DataLoader(dataset, batch_size=1, shuffle=False)
     # for i, data in enumerate(dataloader):
     #     print(i)
+
+    # val
+    val_dataset = {
+        'data_path': '../../Fruit_Fly_Groups/Notebooks/data/user_train.npy',
+        'meta_path': 'meta_info/meta_info_val_0.txt',
+        'num_frame': 150,
+        'total_frame': 4500,
+    }
+    dataset = FlyNormDataset(val_dataset)
+    dataloader = data.DataLoader(dataset, batch_size=1, shuffle=False)
+    labels = []
+    for i, data in enumerate(dataloader):
+        label = data['labels']
+        labels.append(label)
+    labels = torch.cat(labels, dim=0)
+    print(1, labels.shape)
+    for i in range(3):
+        label = labels[:, i]
+        print(i, label.shape)
+        print(0, torch.count_nonzero(label == 0))
+        print(1, torch.count_nonzero(label == 1))
