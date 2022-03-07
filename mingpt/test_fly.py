@@ -12,7 +12,7 @@ import numpy as np
 import torch
 from torch.utils.data.dataloader import DataLoader
 
-from data.fly_dataset import FlyDataset
+from data.fly_dataset import FlyNormDataset
 from model import GPT, GPT1Config
 from utils.misc import set_random_seed
 
@@ -34,8 +34,9 @@ class TesterConfig:
     num_workers = 4
 
     # checkpoint setting
-    ckpt_path = f'./experiments/fly/01_max_epoch_100/epoch1.pth'
+    # ckpt_path = f'./experiments/fly/01_max_epoch_100/epoch1.pth'
     # ckpt_path = f'./experiments/fly/07_lr_1e-3/epoch2.pth'
+    ckpt_path = f'./experiments/fly/15_same_13_F1/epoch16.pth'
     feat_path = ckpt_path.replace('.pth', '_submission.npy')
     # CUDA_VISIBLE_DEVICES=0 python test_fly.py
 
@@ -150,7 +151,7 @@ class Tester:
 if __name__ == '__main__':
     set_random_seed(0)
     config = TesterConfig()
-    test_set = FlyDataset(config.test_dataset)
+    test_set = FlyNormDataset(config.test_dataset)
     print(len(test_set))
 
     gpt_config = GPT1Config(block_size=config.total_frames, 
