@@ -174,7 +174,7 @@ class Evaluator:
                 print(f'{get_time_str()}, subtask: {j}')
                 #https://blog.csdn.net/YNNAD1997/article/details/113829532
                 ctx = torch.multiprocessing.get_context("spawn")
-                pool = ctx.Pool(2)
+                pool = ctx.Pool(self.config['num_process'])
                 pool_list = []
                 # 4. loop lr
                 for lr in self.lr_list:
