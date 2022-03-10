@@ -5,8 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
-from tqdm import tqdm
-
+from utils import get_time_str
 
 class EvalDataset(Dataset):
     """Evaluation dataset.
@@ -49,10 +48,21 @@ class Head(nn.Module):
         return self.fc(x)
 
 
-def train(subtask, train_dataloader, val_dataloader, model, init_state_dict, lr):
-    device = torch.cuda.current_device()
+def create_dataloader(feats, labels, indexes, config):
+    dataset = EvalDataset(feats, labels, indexes)
+    dataloader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=False, pin_memory=True)
+    return dataloader
+
+
+def train(subtask, feats, labels, train_indexes, val_indexes, init_state_dict, lr, config):
+    # create dataloader
+    train_dataloader = create_dataloader(feats, labels, train_indexes, config)
+    val_dataloader = create_dataloader(feats, labels, val_indexes, config)
+    # create model
+    model = Head(config)
     model.load_state_dict(init_state_dict)
     optimizer = optim.SGD(model.parameters(), lr, momentum=0.9)
+    device = torch.cuda.current_device()
     model = nn.DataParallel(model).to(device)
     best_metric = 0
     best_state_dict = init_state_dict
@@ -79,7 +89,7 @@ def train(subtask, train_dataloader, val_dataloader, model, init_state_dict, lr)
             logits = torch.cat(logits, dim=0).cpu()
             labels = torch.cat(labels, dim=0).cpu()
             (acc, P, R, f1) = cal_metric(logits, labels)
-            print(f'epoch: {e + 1}, acc: {acc:.5f}, P: {P:.5f}, R: {R:.5f}, f1: {f1:.5f}')
+            # print(f'epoch: {e + 1}, acc: {acc:.5f}, P: {P:.5f}, R: {R:.5f}, f1: {f1:.5f}')
             if f1 > best_metric:
                 best_metric = f1
                 best_state_dict = copy.deepcopy(model.module.state_dict())
@@ -87,9 +97,13 @@ def train(subtask, train_dataloader, val_dataloader, model, init_state_dict, lr)
 
 
 @torch.no_grad()
-def test(subtask, dataloader, model, state_dict):
-    device = torch.cuda.current_device()
+def test(subtask, feats, labels, test_indexes, state_dict, config):
+    # create dataloader
+    dataloader = create_dataloader(feats, labels, test_indexes, config)
+    # create model
+    model = Head(config)
     model.load_state_dict(state_dict)
+    device = torch.cuda.current_device()
     model = nn.DataParallel(model).to(device)
     model.eval()
     logits = []
@@ -126,13 +140,12 @@ def cal_metric(logits, labels):
 
 class Evaluator:
     def __init__(self, config):
+        self.config = config
         self.num_seeds = config['num_seeds']
         self.num_subtasks = config['num_subtasks']
         self.lr_list = config['lr_list']
         # data
         self.num_samples = config['num_samples']
-        self.batch_size = config['batch_size']
-        self.num_workers = config['num_workers']
         self.indexes_list = []
         for i in range(self.num_seeds):
             indexes = list(range(self.num_samples))
@@ -142,13 +155,13 @@ class Evaluator:
         self.init_state_dict = copy.deepcopy(self.model.state_dict())
 
     def eval(self, feats, labels):
-        """num_seeds * num_subtasks * num_lrs = 3 * 2 * 10
+        """num_seeds * num_subtasks * num_lrs = 3 * 2 * 9
         """
-        print('start evaluation')
+        print(f'{get_time_str()}, start evaluation')
         result = torch.zeros((self.num_seeds, self.num_subtasks))
         # 1. loop seeds
         for i, indexes in enumerate(self.indexes_list):
-            print(f'seed: {i}')
+            print(f'{get_time_str()}, seed: {i}')
             # 2. split train, val and test
             num = self.num_samples
             num_train = int(num * 0.6)
@@ -156,36 +169,32 @@ class Evaluator:
             train_indexes = indexes[: num_train]
             val_indexes = indexes[num_train: num_train + num_val]
             test_indexes = indexes[num_train + num_val:]
-            train_dataset = EvalDataset(feats, labels, train_indexes)
-            val_dataset = EvalDataset(feats, labels, val_indexes)
-            test_dataset = EvalDataset(feats, labels, test_indexes)
-            print(f'total: {num}, train: {len(train_dataset)}, val: {len(val_dataset)}, test:{len(test_dataset)}')
-            train_dataloader = DataLoader(
-                train_dataset, shuffle=False, pin_memory=True, \
-                batch_size=self.batch_size, num_workers=self.num_workers)
-            val_dataloader = DataLoader(
-                val_dataset, shuffle=False, pin_memory=True, \
-                batch_size=self.batch_size, num_workers=self.num_workers)
-            test_dataloader = DataLoader(
-                test_dataset, shuffle=False, pin_memory=True, \
-                batch_size=self.batch_size, num_workers=self.num_workers)
             # 3. loop subtasks
             for j in range(self.num_subtasks):
-                print(f'subtask: {j}')
-                best_metric = 0.
-                best_state_dict = self.init_state_dict
+                print(f'{get_time_str()}, subtask: {j}')
+                #https://blog.csdn.net/YNNAD1997/article/details/113829532
+                ctx = torch.multiprocessing.get_context("spawn")
+                pool = ctx.Pool(2)
+                pool_list = []
                 # 4. loop lr
                 for lr in self.lr_list:
                     # 5. train subtask model
-                    (metric, state_dict) = train(j, train_dataloader, val_dataloader, self.model, self.init_state_dict, lr)
+                    pool_list.append(pool.apply_async(train, (j, feats, labels, train_indexes, val_indexes, self.init_state_dict, lr, self.config,)))
+                pool.close()
+                pool.join()
+                best_metric = 0.
+                best_state_dict = self.init_state_dict
+                for k, p in enumerate(pool_list):
+                    (metric, state_dict) = p.get()
                     if metric > best_metric:
                         best_metric = metric
                         best_state_dict = copy.deepcopy(state_dict)
-                    print(f'lr: {lr:e}, metric: {metric:.5f}, best_metric: {best_metric:.5f}')
+                    print(f'lr: {self.lr_list[k]:e}, metric: {metric:.5f}, best_metric: {best_metric:.5f}')
                 # 6. test
-                (acc, P, R, f1) = cal_metric(*test(j, test_dataloader, self.model, best_state_dict))
-                result[i][j] = f1
-                print(f'seed_{i}, subtask_{j}, acc: {acc:.5f}, P: {P:.5f}, R: {R:.5f}, f1: {f1:.5f}')
-        print(result, result.mean())
-        print('end evaluation')
-        return result.mean()
+                (acc, P, R, f1) = cal_metric(*test(j, feats, labels, test_indexes, best_state_dict, self.config))
+                result[i, j] = f1
+                print(f'{get_time_str()}, seed_{i}, subtask_{j}, acc: {acc:.5f}, P: {P:.5f}, R: {R:.5f}, f1: {f1:.5f}')
+        print(result)
+        print(f'{get_time_str()}, ave:', result.mean())
+        print(f'{get_time_str()}, end evaluation')
+        return result.mean().item()
