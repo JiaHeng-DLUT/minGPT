@@ -65,7 +65,6 @@ class TrainerConfig:
             'num_subtasks': 1,
             'lr_list': [1e-4, 1e-2],
             'batch_size': 8192,
-            'num_workers': 4,
             'input_dim': 256,
             'output_dim': 2,
     }
@@ -94,14 +93,14 @@ class Trainer:
 
     def save_checkpoint(self, epoch):
         # DataParallel wrappers keep raw model object in .module attribute
-        raw_model = self.model.module if hasattr(self.model, "module") else self.model
+        raw_model = self.model.module if hasattr(self.model, 'module') else self.model
         print(f'Saving {self.config.ckpt_dir}/epoch{epoch}.pth')
         os.makedirs(self.config.ckpt_dir, exist_ok=True)
         torch.save(raw_model.state_dict(), f'{self.config.ckpt_dir}/epoch{epoch}.pth')
 
     def train(self):
         model, config = self.model, self.config
-        raw_model = model.module if hasattr(self.model, "module") else model
+        raw_model = model.module if hasattr(self.model, 'module') else model
         optimizer = raw_model.configure_optimizers(config)
 
         def run_epoch(split):
@@ -111,13 +110,8 @@ class Trainer:
             loader = DataLoader(data, shuffle=True, pin_memory=True,
                                 batch_size=config.batch_size,
                                 num_workers=config.num_workers)
-
             pbar = tqdm(enumerate(loader), total=len(loader)) if is_train else enumerate(loader)
-            TP = [0] * 3
-            FN = [0] * 3
-            FP = [0] * 3
-            TN = [0] * 3
-            F1 = []
+
             feats = []
             labels = []
             for it, data in pbar:
@@ -129,13 +123,10 @@ class Trainer:
 
                 # forward the model
                 with torch.set_grad_enabled(is_train):
-                    feat, loss1, loss2, loss3, tp, fn, fp, tn = model(x, pos, y)
-                    loss = loss1 + loss2 + loss3
-                    for i in range(3):
-                        TP[i] += tp[i]
-                        FN[i] += fn[i]
-                        FP[i] += fp[i]
-                        TN[i] += tn[i]
+                    feat, losses = model(x, pos, y)
+                    loss = 0
+                    for k, v in losses.items():
+                        loss += v
 
                 if is_train:
 
@@ -162,7 +153,10 @@ class Trainer:
                         lr = config.learning_rate
 
                     # report progress
-                    print(f"epoch {epoch+1} iter {it}: train loss {loss.item():.5f} = {loss1.item():.5f} + {loss2.item():.5f} + {loss3.item():.5f}. lr {lr:e}")
+                    print(f'epoch {epoch+1}, iter {it}, lr {lr:e}, train loss: {loss.item():.5f}', end='')
+                    for k, v in losses.items():
+                        print(f', {k}: {v.item():.5f}', end='')
+                    print()
                 else:
                     feat = feat.view(-1, feat.shape[-1]).cpu()
                     feats.append(feat)
@@ -173,40 +167,21 @@ class Trainer:
             if not is_train:
                 feats = torch.cat(feats, dim=0)
                 labels = torch.cat(labels, dim=0)
-                for i in range(3):
-                    print(f'Task {i}:')
-                    if (TP[i] + FP[i]) != 0 and (TP[i] + TN[i]) != 0:
-                        P = TP[i] / (TP[i] + FP[i])
-                        R = TP[i] / (TP[i] + TN[i])
-                        print(f'TP, FN, sum: {TP[i]}, {FN[i]}, {TP[i] + FN[i]}')
-                        print(f'FP, TN, sum: {FP[i]}, {TN[i]}, {FP[i] + TN[i]}')
-                        acc = TP[i] / (TP[i] + FN[i] + FP[i] + TN[i])
-                        print(f'Acc: {acc} = {TP[i]} / {TP[i] + FN[i] + FP[i] + TN[i]}')
-                        print(f'P, R: {P}, {R}')
-                        f1 = 2 * P * R / (P + R)
-                        print(f'F1: {f1}')
-                        F1.append(f1)
-                ave = sum(F1) / len(F1)
-                print(f"ave_f1: {ave}")
-                return ave, feats, labels
+                return (feats, labels)
 
-        best_f1 = 0
         self.tokens = 0 # counter used for learning rate decay
         if self.test_dataset is not None:
-            best_f1, feats, labels = run_epoch('test')
-            self.evaluator.eval(feats, labels)
+            best_metric = self.evaluator.eval(*run_epoch('test'))
         for epoch in range(config.max_epochs):
             run_epoch('train')
             torch.cuda.empty_cache()
             if self.test_dataset is not None:
-                val_f1, feats, labels = run_epoch('test')
-                self.evaluator.eval(feats, labels)
+                metric = self.evaluator.eval(*run_epoch('test'))
                 torch.cuda.empty_cache()
-            # supports early stopping based on the val acc, or just save always if no test set is provided
-            good_model = self.test_dataset is None or val_f1 > best_f1
-            if self.config.ckpt_dir is not None and good_model:
-                best_f1 = val_f1
-                self.save_checkpoint(epoch + 1)
+                if metric > best_metric:
+                    best_metric = metric
+                    self.save_checkpoint(epoch + 1)
+
 
 if __name__ == '__main__':
     set_random_seed(0)

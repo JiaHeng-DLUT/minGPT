@@ -209,24 +209,10 @@ class GPT(nn.Module):
         loss1 = F.cross_entropy(logits1, label1, ignore_index=-100)
         loss2 = F.cross_entropy(logits2, label2, ignore_index=-100)
         loss3 = F.cross_entropy(logits3, label3, ignore_index=-100)
+        losses = {
+            'loss1': loss1,
+            'loss2': loss2,
+            'loss3': loss3,
+        }
 
-        tp = []
-        fn = []
-        fp = []
-        tn = []
-        pred = torch.argmax(logits1, dim=1)
-        tp.append(((label1 == 1) & (pred == 1)).sum().item())
-        fn.append(((label1 == 1) & (pred == 0)).sum().item())
-        fp.append(((label1 == 0) & (pred == 1)).sum().item())
-        tn.append(((label1 == 0) & (pred == 0)).sum().item())
-        pred = torch.argmax(logits2, dim=1)
-        tp.append(((label2 == 1) & (pred == 1)).sum().item())
-        fn.append(((label2 == 1) & (pred == 0)).sum().item())
-        fp.append(((label2 == 0) & (pred == 1)).sum().item())
-        tn.append(((label2 == 0) & (pred == 0)).sum().item())
-        pred = torch.argmax(logits3, dim=1)
-        tp.append(((label3 == 1) & (pred == 1)).sum().item())
-        fn.append(((label3 == 1) & (pred == 0)).sum().item())
-        fp.append(((label3 == 0) & (pred == 1)).sum().item())
-        tn.append(((label3 == 0) & (pred == 0)).sum().item())
-        return x, loss1, loss2, loss3, tp, fn, fp, tn
+        return x, losses
