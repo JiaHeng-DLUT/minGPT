@@ -56,14 +56,11 @@ class TrainerConfig:
     # CUDA_VISIBLE_DEVICES=3 python 37_norm_data.py > experiments/fly/log/37_norm_data.log
 
     evaluator_config = {
-            # 'num_seeds': 3,
-            # 'num_subtasks': 2,
-            # 'lr_list': [1e-6, 1e-5, 1e-4, \
-            #             1e-3, 1e-2, 1e-1, \
-            #             1e0, 1e1, 1e2],
-            'num_seeds': 1,
-            'num_subtasks': 1,
-            'lr_list': [1e-4, 1e-2],
+            'num_seeds': 3,
+            'num_subtasks': 2,
+            'lr_list': [1e-6, 1e-5, 1e-4, \
+                        1e-3, 1e-2, 1e-1, \
+                        1e0, 1e1, 1e2],
             'batch_size': 8192,
             'input_dim': 256,
             'output_dim': 2,
