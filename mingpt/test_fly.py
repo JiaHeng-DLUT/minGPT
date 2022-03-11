@@ -36,7 +36,8 @@ class TesterConfig:
     # checkpoint setting
     # ckpt_path = f'./experiments/fly/01_max_epoch_100/epoch1.pth'
     # ckpt_path = f'./experiments/fly/07_lr_1e-3/epoch2.pth'
-    ckpt_path = f'./experiments/fly/15_same_13_F1/epoch16.pth'
+    # ckpt_path = f'./experiments/fly/41_lr_1e-5_194/epoch12.pth'
+    ckpt_path = f'./experiments/fly/41_lr_1e-5_194/epoch23.pth'
     feat_path = ckpt_path.replace('.pth', '_submission.npy')
     # CUDA_VISIBLE_DEVICES=0 python test_fly.py
 
@@ -107,6 +108,7 @@ class Tester:
             self.device = torch.cuda.current_device()
             self.model = torch.nn.DataParallel(self.model).to(self.device)
 
+    @torch.no_grad()
     def test(self):
         model, config = self.model, self.config
 
@@ -133,9 +135,9 @@ class Tester:
                 frame_number_map[id] = (st, ed)
             # forward the model
             with torch.set_grad_enabled(is_train):
-                feat = model(x, pos, y=None).view(-1, self.config.output_dim)
+                feat = model(x, pos, y=None).view(-1, self.config.output_dim).cpu()
             feats.append(feat)
-        feats = torch.cat(feats, dim=0).detach().cpu().numpy()
+        feats = torch.cat(feats, dim=0).numpy()
         # print(1, feats.shape)
         # for k in frame_number_map:
         #     print(k, frame_number_map[k])
