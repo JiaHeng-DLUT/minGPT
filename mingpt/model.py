@@ -113,9 +113,15 @@ class GPT(nn.Module):
         # decoder head
         self.ln_f = nn.LayerNorm(config.n_embd)
         self.proj = nn.Linear(config.n_embd, config.output_dim)
-        self.head1 = nn.Linear(config.output_dim, 2, bias=False)
-        self.head2 = nn.Linear(config.output_dim, 2, bias=False)
-        self.head3 = nn.Linear(config.output_dim, 2, bias=False)
+        self.decoder = nn.Sequential(
+            nn.Linear(config.output_dim, config.output_dim),
+            nn.GELU(),
+            nn.LayerNorm(config.output_dim),
+            nn.Linear(config.output_dim, config.input_dim)
+        )
+        # self.head1 = nn.Linear(config.output_dim, 2, bias=False)
+        # self.head2 = nn.Linear(config.output_dim, 2, bias=False)
+        # self.head3 = nn.Linear(config.output_dim, 2, bias=False)
 
         self.block_size = config.block_size
         self.apply(self._init_weights)
@@ -180,13 +186,13 @@ class GPT(nn.Module):
         optimizer = torch.optim.AdamW(optim_groups, lr=train_config.learning_rate, betas=train_config.betas)
         return optimizer
 
-    def forward(self, x, pos, y=None):
-        b = x.shape[0]
-        t = x.shape[1]
+    def forward(self, tokens, pos, y=None):
+        b = tokens.shape[0]
+        t = tokens.shape[1]
         assert t <= self.block_size, "Cannot forward, model block size is exhausted."
 
         # forward the GPT model
-        token_embeddings = self.tok_emb(x)
+        token_embeddings = self.tok_emb(tokens)
         position_embeddings = []
         for i in range(b):
             position_embeddings.append(self.pos_emb[:, pos[i] : pos[i] + self.config.num_tokens, :])
@@ -200,19 +206,22 @@ class GPT(nn.Module):
         if y is None:
             return x
 
-        logits1 = self.head1(x).view(-1, 2) #(b * num_tokens, 2)
-        logits2 = self.head2(x).view(-1, 2)
-        logits3 = self.head3(x).view(-1, 2)
-        label1 = y[:, 0].reshape(-1)
-        label2 = y[:, 1].reshape(-1)
-        label3 = y[:, 2].reshape(-1)
-        loss1 = F.cross_entropy(logits1, label1, ignore_index=-100)
-        loss2 = F.cross_entropy(logits2, label2, ignore_index=-100)
-        loss3 = F.cross_entropy(logits3, label3, ignore_index=-100)
+        # logits1 = self.head1(x).view(-1, 2) #(b * num_tokens, 2)
+        # logits2 = self.head2(x).view(-1, 2)
+        # logits3 = self.head3(x).view(-1, 2)
+        # label1 = y[:, 0].reshape(-1)
+        # label2 = y[:, 1].reshape(-1)
+        # label3 = y[:, 2].reshape(-1)
+        # loss1 = F.cross_entropy(logits1, label1, ignore_index=-100)
+        # loss2 = F.cross_entropy(logits2, label2, ignore_index=-100)
+        # loss3 = F.cross_entropy(logits3, label3, ignore_index=-100)
+        pred = self.decoder(x[:, :-1])
+        regression_loss = F.mse_loss(pred, tokens[:, 1:])
         losses = {
-            'loss1': loss1,
-            'loss2': loss2,
-            'loss3': loss3,
+            # 'loss1': loss1,
+            # 'loss2': loss2,
+            # 'loss3': loss3,
+            'regression_loss': regression_loss,
         }
 
         return x, losses
