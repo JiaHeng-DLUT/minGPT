@@ -119,9 +119,9 @@ class GPT(nn.Module):
             nn.LayerNorm(config.output_dim),
             nn.Linear(config.output_dim, config.input_dim)
         )
-        # self.head1 = nn.Linear(config.output_dim, 2, bias=False)
-        # self.head2 = nn.Linear(config.output_dim, 2, bias=False)
-        # self.head3 = nn.Linear(config.output_dim, 2, bias=False)
+        self.head1 = nn.Linear(config.output_dim, 2, bias=False)
+        self.head2 = nn.Linear(config.output_dim, 2, bias=False)
+        self.head3 = nn.Linear(config.output_dim, 2, bias=False)
 
         self.block_size = config.block_size
         self.apply(self._init_weights)
@@ -206,21 +206,21 @@ class GPT(nn.Module):
         if y is None:
             return x
 
-        # logits1 = self.head1(x).view(-1, 2) #(b * num_tokens, 2)
-        # logits2 = self.head2(x).view(-1, 2)
-        # logits3 = self.head3(x).view(-1, 2)
-        # label1 = y[:, 0].reshape(-1)
-        # label2 = y[:, 1].reshape(-1)
-        # label3 = y[:, 2].reshape(-1)
-        # loss1 = F.cross_entropy(logits1, label1, ignore_index=-100)
-        # loss2 = F.cross_entropy(logits2, label2, ignore_index=-100)
-        # loss3 = F.cross_entropy(logits3, label3, ignore_index=-100)
+        logits1 = self.head1(x).view(-1, 2) #(b * num_tokens, 2)
+        logits2 = self.head2(x).view(-1, 2)
+        logits3 = self.head3(x).view(-1, 2)
+        label1 = y[:, 0].reshape(-1)
+        label2 = y[:, 1].reshape(-1)
+        label3 = y[:, 2].reshape(-1)
+        loss1 = F.cross_entropy(logits1, label1, ignore_index=-100)
+        loss2 = F.cross_entropy(logits2, label2, ignore_index=-100)
+        loss3 = F.cross_entropy(logits3, label3, ignore_index=-100)
         pred = self.decoder(x[:, :-1])
         regression_loss = F.mse_loss(pred, tokens[:, 1:])
         losses = {
-            # 'loss1': loss1,
-            # 'loss2': loss2,
-            # 'loss3': loss3,
+            'loss1': loss1,
+            'loss2': loss2,
+            'loss3': loss3,
             'regression_loss': regression_loss,
         }
 
