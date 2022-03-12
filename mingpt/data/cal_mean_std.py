@@ -14,3 +14,8 @@ keypoints = np.concatenate(keypoints, axis=0)
 print(1, keypoints.shape)
 print(2, list(np.nanmean(keypoints, axis=0)))
 print(3, list(np.nanstd(keypoints, axis=0)))
+_ = np.nan_to_num(keypoints, nan=-100)
+print(4, list(_.max(axis=0)))
+_ = np.nan_to_num(keypoints, nan=100)
+print(5, list(_.min(axis=0)))
+
