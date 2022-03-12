@@ -37,7 +37,8 @@ class TesterConfig:
     # ckpt_path = f'./experiments/fly/01_max_epoch_100/epoch1.pth'
     # ckpt_path = f'./experiments/fly/07_lr_1e-3/epoch2.pth'
     # ckpt_path = f'./experiments/fly/41_lr_1e-5_194/epoch12.pth'
-    ckpt_path = f'./experiments/fly/41_lr_1e-5_194/epoch23.pth'
+    # ckpt_path = f'./experiments/fly/41_lr_1e-5_194/epoch23.pth'
+    ckpt_path = f'./experiments/fly/47_regression_ce_lr1e-4/epoch23.pth'
     feat_path = ckpt_path.replace('.pth', '_submission.npy')
     # CUDA_VISIBLE_DEVICES=0 python test_fly.py
 
