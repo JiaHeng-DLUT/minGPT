@@ -11,23 +11,19 @@ class EvalDataset(Dataset):
     """Evaluation dataset.
     """
 
-    def __init__(self, feats, labels, indexes):
+    def __init__(self, feats, labels):
         super(EvalDataset, self).__init__()
         self.feats = feats
         self.labels = labels
-        self.indexes = indexes
 
     def __getitem__(self, i):
-        index = self.indexes[i]
-        feat = self.feats[index]
-        label = self.labels[index]
         return {
-            'feat': feat,
-            'label': label,
+            'feat': self.feats,
+            'label': self.labels,
         }
 
     def __len__(self):
-        return len(self.indexes)
+        return 1
 
 
 class Head(nn.Module):
@@ -49,8 +45,10 @@ class Head(nn.Module):
 
 
 def create_dataloader(feats, labels, indexes, config):
-    dataset = EvalDataset(feats, labels, indexes)
-    dataloader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=False, pin_memory=True)
+    feats = feats[indexes]
+    labels = labels[indexes]
+    dataset = EvalDataset(feats, labels)
+    dataloader = DataLoader(dataset, batch_size=config['batch_size'], shuffle=False)
     return dataloader
 
 
@@ -69,8 +67,8 @@ def train(subtask, feats, labels, train_indexes, val_indexes, init_state_dict, l
     for e in range(20):
         model.train()
         for data in train_dataloader:
-            feat = data['feat'].to(device)
-            label = data['label'][:, subtask].to(device)
+            feat = data['feat'].squeeze(0)
+            label = data['label'].squeeze(0)[:, subtask]
             logit = model(feat)
             loss = F.cross_entropy(logit, label)
             model.zero_grad()
@@ -81,8 +79,8 @@ def train(subtask, feats, labels, train_indexes, val_indexes, init_state_dict, l
         labels = []
         with torch.set_grad_enabled(False):
             for data in val_dataloader:
-                feat = data['feat'].to(device)
-                label = data['label'][:, subtask]
+                feat = data['feat'].squeeze(0)
+                label = data['label'].squeeze(0)[:, subtask]
                 logit = model(feat)
                 logits.append(logit)
                 labels.append(label)
@@ -109,8 +107,8 @@ def test(subtask, feats, labels, test_indexes, state_dict, config):
     logits = []
     labels = []
     for data in dataloader:
-        feat = data['feat'].to(device)
-        label = data['label'][:, subtask].to(device)
+        feat = data['feat'].squeeze(0)
+        label = data['label'].squeeze(0)[:, subtask]
         logit = model(feat)
         logits.append(logit)
         labels.append(label)

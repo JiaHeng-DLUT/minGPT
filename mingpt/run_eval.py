@@ -54,18 +54,18 @@ class TrainerConfig:
 
     # checkpoint settings
     ckpt_dir = f'./experiments/fly/45_lr_regression_lr_cosine'
-    start_epoch = 0
-    end_epoch = 10
-    # CUDA_VISIBLE_DEVICES=1 python run_eval.py > experiments/fly/log/eval_45_lr_regression_lr_cosine_0_10.log
+    start_epoch = 11
+    end_epoch = 46
+    # CUDA_VISIBLE_DEVICES=0 python run_eval.py > experiments/fly/log/eval_45_lr_regression_lr_cosine_11_46.log
 
     evaluator_config = {
             'num_seeds': 3,
             'num_subtasks': 2,
-            'num_process': 5,
+            'num_process': 1,
             'lr_list': [1e-6, 1e-5, 1e-4, \
                         1e-3, 1e-2, 1e-1, \
                         1e0, 1e1, 1e2],
-            'batch_size': 8192,
+            'batch_size': 1,
             'input_dim': 256,
             'output_dim': 2,
     }
@@ -92,6 +92,7 @@ class Trainer:
         config = self.config
 
         def run_epoch(epoch):
+            print(f'epoch: {epoch}!!!')
             # Dataset
             loader = DataLoader(self.test_dataset, shuffle=False, pin_memory=True,
                                 batch_size=config.batch_size,
@@ -117,8 +118,10 @@ class Trainer:
                     label = y.transpose(-1, -2)
                     label = label.reshape(-1, label.shape[-1])
                     labels.append(label)
-                feats = torch.cat(feats, dim=0).cpu()
-                labels = torch.cat(labels, dim=0).cpu()
+                model = model.to('cpu')
+                torch.cuda.empty_cache()
+                feats = torch.cat(feats, dim=0)
+                labels = torch.cat(labels, dim=0)
                 return (feats, labels)
 
         for epoch in range(config.start_epoch, config.end_epoch):
