@@ -53,10 +53,10 @@ class TrainerConfig:
     final_tokens = 260e9 # (at what point we reach 10% of original LR)
 
     # checkpoint settings
-    ckpt_dir = f'./experiments/fly/45_lr_regression_lr_cosine'
-    start_epoch = 11
-    end_epoch = 46
-    # CUDA_VISIBLE_DEVICES=0 python run_eval.py > experiments/fly/log/eval_45_lr_regression_lr_cosine_11_46.log
+    ckpt_dir = f'./experiments/fly/47_regression_ce_lr1e-4'
+    start_epoch = 0
+    end_epoch = 31
+    # CUDA_VISIBLE_DEVICES=1 python run_eval.py > experiments/fly/log/eval_47_regression_ce_lr1e-4.log
 
     evaluator_config = {
             'num_seeds': 3,
@@ -112,7 +112,7 @@ class Trainer:
                     y = data['labels'].to(self.device).long()       #(b, 3, clip_frame)
                     pos = data['pos']
                     # forward the model
-                    feat, losses = model(x, pos, y)
+                    feat = model(x, pos, y=None)
                     feat = feat.view(-1, feat.shape[-1])
                     feats.append(feat)
                     label = y.transpose(-1, -2)
