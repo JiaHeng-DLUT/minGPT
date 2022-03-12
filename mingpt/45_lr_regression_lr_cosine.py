@@ -135,6 +135,7 @@ class Trainer:
                     loss.backward()
                     torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_norm_clip)
                     optimizer.step()
+                    scheduler.step()
                     # report progress
                     print(f'epoch {epoch+1}, iter {it}, lr {scheduler.get_lr()[0]:e}, train loss: {loss.item():.5f}', end='')
                     for k, v in losses.items():
@@ -151,8 +152,6 @@ class Trainer:
                 feats = torch.cat(feats, dim=0)
                 labels = torch.cat(labels, dim=0)
                 return (feats, labels)
-            else:
-                scheduler.step()
 
         # if self.test_dataset is not None:
         #     self.evaluator.eval(*run_epoch('test'))
