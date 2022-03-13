@@ -7,6 +7,7 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from utils import get_time_str
 
+
 class EvalDataset(Dataset):
     """Evaluation dataset.
     """
@@ -170,24 +171,16 @@ class Evaluator:
             # 3. loop subtasks
             for j in range(self.num_subtasks):
                 print(f'{get_time_str()}, subtask: {j}')
-                #https://blog.csdn.net/YNNAD1997/article/details/113829532
-                ctx = torch.multiprocessing.get_context("spawn")
-                pool = ctx.Pool(self.config['num_process'])
-                pool_list = []
                 # 4. loop lr
-                for lr in self.lr_list:
-                    # 5. train subtask model
-                    pool_list.append(pool.apply_async(train, (j, feats, labels, train_indexes, val_indexes, self.init_state_dict, lr, self.config,)))
-                pool.close()
-                pool.join()
                 best_metric = 0.
                 best_state_dict = self.init_state_dict
-                for k, p in enumerate(pool_list):
-                    (metric, state_dict) = p.get()
+                for lr in self.lr_list:
+                    # 5. train subtask model
+                    (metric, state_dict) = train(j, feats, labels, train_indexes, val_indexes, self.init_state_dict, lr, self.config)
                     if metric > best_metric:
                         best_metric = metric
                         best_state_dict = copy.deepcopy(state_dict)
-                    print(f'lr: {self.lr_list[k]:e}, metric: {metric:.5f}, best_metric: {best_metric:.5f}')
+                    print(f'lr: {lr:e}, metric: {metric:.5f}, best_metric: {best_metric:.5f}')
                 # 6. test
                 (acc, P, R, f1) = cal_metric(*test(j, feats, labels, test_indexes, best_state_dict, self.config))
                 result[i, j] = f1
