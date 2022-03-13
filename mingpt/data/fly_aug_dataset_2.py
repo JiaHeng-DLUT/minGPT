@@ -52,6 +52,8 @@ class fly_aug_dataset_2(data.Dataset):
         print(f'v_translation_prob: {self.v_translation_prob}')
         self.max_translation = opt['max_translation'] if 'max_translation' in opt else None
         print(f'max_translation: {self.max_translation}')
+        self.rotation_prob = opt['rotation_prob'] if 'rotation_prob' in opt else None
+        print(f'rotation_prob: {self.rotation_prob}')
         print('---')
 
     def __getitem__(self, index):
@@ -80,6 +82,19 @@ class fly_aug_dataset_2(data.Dataset):
             if np.random.uniform() < self.v_translation_prob:
                 v_translation = np.random.uniform(low=-self.max_translation, high=self.max_translation)
                 keypoints[:, :, :20, 1] += v_translation
+        if self.rotation_prob is not None:
+            # if np.random.uniform() < self.rotation_prob:
+            if np.random.uniform() < 1:
+                rotation = np.random.uniform(low=-np.pi, high=np.pi)
+                R = torch.Tensor([
+                    [np.cos(rotation), -np.sin(rotation)],
+                    [np.sin(rotation), np.cos(rotation)]
+                ])
+                keypoints[:, :, :20] = keypoints[:, :, :20] @ R
+                angle = torch.acos(keypoints[:, :, 20, 0])
+                angle -= rotation
+                keypoints[:, :, 20, 0] = torch.cos(angle)
+                keypoints[:, :, 20, 1] = torch.sin(angle)
 
         keypoints = torch.flatten(keypoints, 2)         # (num_frame, 11, 48)
         keypoints = (keypoints - self.mean) / self.std
