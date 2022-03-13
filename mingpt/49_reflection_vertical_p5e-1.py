@@ -2,11 +2,12 @@
 CosineAnnealingLR(optimizer, T_max=7000, eta_min=1e-7)
 """
 import os
+import time
 import torch
 import torch.optim as optim
 from torch.utils.data.dataloader import DataLoader
 from tqdm import tqdm
-from data.fly_aug_dataset import FlyNormAugDataset
+from data.fly_aug_dataset_1 import fly_aug_dataset_1
 from eval import Evaluator
 from model import GPT, GPT1Config
 from utils import set_random_seed
@@ -108,6 +109,7 @@ class Trainer:
 
             feats = []
             labels = []
+            data_st = time.time()
             for it, data in pbar:
 
                 # place data on the correct device
@@ -116,6 +118,8 @@ class Trainer:
                 pos = data['pos']
 
                 # forward the model
+                data_ed = time.time()
+                iter_st = data_ed
                 with torch.set_grad_enabled(is_train):
                     feat, losses = model(x, pos, y)
 
@@ -130,10 +134,14 @@ class Trainer:
                     optimizer.step()
                     scheduler.step()
                     # report progress
-                    print(f'epoch {epoch+1}, iter {it}, lr {scheduler.get_lr()[0]:e}, train loss: {loss.item():.5f}', end='')
+                    iter_ed = time.time()
+                    data_time = data_ed - data_st
+                    iter_time = iter_ed - iter_st
+                    print(f'epoch: {epoch+1}, iter: {it}, lr: {scheduler.get_lr()[0]:e}, time (data): {iter_time + data_time:.3f} ({data_time:.3f}), l_total: {loss.item():.5f}', end='')
                     for k, v in losses.items():
                         print(f', {k}: {v.item():.5f}', end='')
                     print()
+                    data_st = time.time()
                 else:
                     feat = feat.view(-1, feat.shape[-1])
                     feats.append(feat)
@@ -161,8 +169,8 @@ class Trainer:
 if __name__ == '__main__':
     set_random_seed(0)
     config = TrainerConfig()
-    train_set = FlyNormAugDataset(config.train_dataset)
-    val_set = FlyNormAugDataset(config.val_dataset)
+    train_set = fly_aug_dataset_1(config.train_dataset)
+    val_set = fly_aug_dataset_1(config.val_dataset)
     print(len(train_set), len(val_set))
     # train_loader = DataLoader(train_set, batch_size=2, shuffle=True, num_workers=1, pin_memory=True,)
     # val_loader = DataLoader(val_set, batch_size=2, shuffle=False, num_workers=1, pin_memory=True,)
