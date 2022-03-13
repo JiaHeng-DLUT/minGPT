@@ -5,12 +5,17 @@ import os
 import time
 import torch
 import torch.optim as optim
+import wandb
+
 from torch.utils.data.dataloader import DataLoader
 from tqdm import tqdm
 from data.fly_aug_dataset_2 import fly_aug_dataset_2
 from eval import Evaluator
 from model import GPT, GPT1Config
 from utils import set_random_seed
+
+
+wandb.init(project="fly", entity="jiaheng")
 
 
 class TrainerConfig:
@@ -141,6 +146,9 @@ class Trainer:
                     iter_ed = time.time()
                     data_time = data_ed - data_st
                     iter_time = iter_ed - iter_st
+                    wandb.log({
+                        "loss": loss
+                    })
                     print(f'epoch: {epoch+1}, iter: {it}, lr: {scheduler.get_lr()[0]:e}, time (data): {iter_time + data_time:.3f} ({data_time:.3f}), l_total: {loss.item():.5f}', end='')
                     for k, v in losses.items():
                         print(f', {k}: {v.item():.5f}', end='')
@@ -173,6 +181,11 @@ class Trainer:
 if __name__ == '__main__':
     set_random_seed(0)
     config = TrainerConfig()
+    wandb.config = {
+        "learning_rate": config.learning_rate,
+        "epochs": config.max_epochs,
+        "batch_size": config.batch_size,
+    }
     train_set = fly_aug_dataset_2(config.train_dataset)
     val_set = fly_aug_dataset_2(config.val_dataset)
     print(len(train_set), len(val_set))
