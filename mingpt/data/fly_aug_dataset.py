@@ -40,6 +40,9 @@ class FlyNormAugDataset(data.Dataset):
 
         self.horizon_flip_prob = opt['horizon_flip_prob'] if 'horizon_flip_prob' in opt else None
         print(f'horizon_flip_prob: {self.horizon_flip_prob}')
+        self.vertical_flip_prob = opt['vertical_flip_prob'] if 'vertical_flip_prob' in opt else None
+        print(f'vertical_flip_prob: {self.vertical_flip_prob}')
+        print('---')
 
     def __getitem__(self, index):
         id = self.id_list[index // self.num_repeat]
@@ -51,6 +54,13 @@ class FlyNormAugDataset(data.Dataset):
                 keypoints[:, :, :20, 0] = -keypoints[:, :, :20, 0]
                 # (-cos, sin)
                 keypoints[:, :, -4, 0] = -keypoints[:, :, -4, 0]
+        if self.vertical_flip_prob is not None:
+            if np.random.uniform() < self.vertical_flip_prob:
+                # (x, -y)
+                keypoints[:, :, :20, 1] = -keypoints[:, :, :20, 1]
+                # (cos, -sin)
+                keypoints[:, :, -4, 1] = -keypoints[:, :, -4, 1]
+
 
         keypoints = torch.flatten(keypoints, 2)                     # (4500, 11, 48)
         keypoints = (keypoints - self.mean) / self.std
