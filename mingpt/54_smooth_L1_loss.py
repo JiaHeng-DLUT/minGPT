@@ -136,6 +136,7 @@ class Trainer:
                     loss = 0
                     for k, v in losses.items():
                         loss += v
+                        wandb.log({k: v.item()})
                     # backprop and update the parameters
                     model.zero_grad()
                     loss.backward()
@@ -146,9 +147,6 @@ class Trainer:
                     iter_ed = time.time()
                     data_time = data_ed - data_st
                     iter_time = iter_ed - iter_st
-                    wandb.log({
-                        "loss": loss
-                    })
                     print(f'epoch: {epoch+1}, iter: {it}, lr: {scheduler.get_lr()[0]:e}, time (data): {iter_time + data_time:.3f} ({data_time:.3f}), l_total: {loss.item():.5f}', end='')
                     for k, v in losses.items():
                         print(f', {k}: {v.item():.5f}', end='')
@@ -173,6 +171,7 @@ class Trainer:
             run_epoch('train')
             if self.test_dataset is not None:
                 metric = self.evaluator.eval(*run_epoch('test'))
+                wandb.log({'metric': metric})
                 if metric > best_metric:
                     best_metric = metric
                     self.save_checkpoint(epoch + 1)
