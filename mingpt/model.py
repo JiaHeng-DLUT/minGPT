@@ -228,8 +228,8 @@ class GPT(nn.Module):
             # 'loss1': loss1,
             # 'loss2': loss2,
             # 'loss3': loss3,
-            'l_regression': l_regression,
-            'l_regression_RL': l_regression_RL,
+            'l_regression': l_regression * 0.5,
+            'l_regression_RL': l_regression_RL * 0.5,
         }
 
         return x, losses
