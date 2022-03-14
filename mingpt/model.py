@@ -199,6 +199,7 @@ class GPT(nn.Module):
         position_embeddings = torch.cat(position_embeddings, dim=0)
         
         x = self.drop(token_embeddings + position_embeddings)
+        x2 = x.flip(1)
         x = self.blocks(x)
         x = self.ln_f(x)
         x = self.proj(x)        #(b, num_tokens, output_dim)
@@ -215,13 +216,20 @@ class GPT(nn.Module):
         # loss1 = F.cross_entropy(logits1, label1, ignore_index=-100)
         # loss2 = F.cross_entropy(logits2, label2, ignore_index=-100)
         # loss3 = F.cross_entropy(logits3, label3, ignore_index=-100)
+
         pred = self.decoder(x[:, :-1])
         l_regression = F.smooth_l1_loss(pred, tokens[:, 1:])
+        x2 = self.blocks(x2)
+        x2 = self.ln_f(x2)
+        x2 = self.proj(x2)
+        pred2 = self.decoder(x2[:, :-1])
+        l_regression_RL = F.smooth_l1_loss(pred2, tokens.flip(1)[:, 1:])
         losses = {
             # 'loss1': loss1,
             # 'loss2': loss2,
             # 'loss3': loss3,
             'l_regression': l_regression,
+            'l_regression_RL': l_regression_RL,
         }
 
         return x, losses
