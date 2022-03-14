@@ -216,7 +216,7 @@ class GPT(nn.Module):
         # loss2 = F.cross_entropy(logits2, label2, ignore_index=-100)
         # loss3 = F.cross_entropy(logits3, label3, ignore_index=-100)
         pred = self.decoder(x[:, :-1])
-        l_regression = F.l1_loss(pred, tokens[:, 1:])
+        l_regression = F.smooth_l1_loss(pred, tokens[:, 1:])
         losses = {
             # 'loss1': loss1,
             # 'loss2': loss2,
