@@ -223,7 +223,7 @@ class GPT(nn.Module):
         x2 = self.ln_f(x2)
         x2 = self.proj(x2)
         pred2 = self.decoder(x2[:, :-1])
-        l_regression_RL = F.smooth_l1_loss(pred2, tokens.flip(1)[:, 1:])
+        l_regression_RL = F.mse_loss(pred2, tokens.flip(1)[:, 1:])
         losses = {
             # 'loss1': loss1,
             # 'loss2': loss2,
