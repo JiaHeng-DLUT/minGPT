@@ -115,7 +115,7 @@ class GPT(nn.Module):
         self.proj = nn.Linear(config.n_embd, config.output_dim)
         self.decoder = nn.Sequential(
             nn.Linear(config.output_dim, config.output_dim),
-            nn.GELU(),
+            nn.Tanh(),
             nn.LayerNorm(config.output_dim),
             nn.Linear(config.output_dim, config.input_dim)
         )
