@@ -218,12 +218,12 @@ class GPT(nn.Module):
         # loss3 = F.cross_entropy(logits3, label3, ignore_index=-100)
 
         pred = self.decoder(x[:, :-1])
-        l_regression = F.mse_loss(pred, tokens[:, 1:])
+        l_regression = F.mse_loss(pred, tokens[:, 1:] - tokens[:, :-1])
         x2 = self.blocks(x2)
         x2 = self.ln_f(x2)
         x2 = self.proj(x2)
         pred2 = self.decoder(x2[:, :-1])
-        l_regression_RL = F.mse_loss(pred2, tokens.flip(1)[:, 1:])
+        l_regression_RL = F.mse_loss(pred2, tokens.flip(1)[:, 1:] - tokens.flip(1)[:, :-1])
         losses = {
             # 'loss1': loss1,
             # 'loss2': loss2,
