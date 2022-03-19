@@ -31,7 +31,7 @@ class GPT1Config(GPTConfig):
     """ GPT-1 like network roughly 125M params """
     n_layer = 12
     n_head = 12
-    n_embd = 768
+    n_embd = 48
 
 class CausalSelfAttention(nn.Module):
     """
@@ -53,8 +53,12 @@ class CausalSelfAttention(nn.Module):
         # output projection
         self.proj = nn.Linear(config.n_embd, config.n_embd)
         # causal mask to ensure that attention is only applied to the left in the input sequence
-        self.register_buffer("mask", torch.tril(torch.ones(config.block_size, config.block_size))
-                                     .view(1, 1, config.block_size, config.block_size))
+        num_frame = config.num_tokens
+        num_id = config.num_animals
+        a = torch.tril(torch.ones(num_frame, num_frame))[:, :, None, None]
+        b = torch.ones(1, 1, num_id, num_id)
+        mask = (a * b).transpose(1, 2).reshape(num_frame * num_id, -1)[None, None, :, :]
+        self.register_buffer("mask", mask)
         self.n_head = config.n_head
 
     def forward(self, x, layer_past=None):
@@ -189,6 +193,7 @@ class GPT(nn.Module):
     def forward(self, tokens, pos, y=None):
         b = tokens.shape[0]
         t = tokens.shape[1]
+        c = tokens.shape[2]
         assert t <= self.block_size, "Cannot forward, model block size is exhausted."
 
         # forward the GPT model
@@ -196,15 +201,17 @@ class GPT(nn.Module):
         position_embeddings = []
         for i in range(b):
             position_embeddings.append(self.pos_emb[:, pos[i] : pos[i] + self.config.num_tokens, :])
-        position_embeddings = torch.cat(position_embeddings, dim=0)
-        
-        x = self.drop(token_embeddings + position_embeddings)
+        position_embeddings = torch.cat(position_embeddings, dim=0)[:, :, None, :]
+
+        embeddings = (token_embeddings + position_embeddings).view(b, t * c, -1)
+        x = self.drop(embeddings)
         x2 = x.flip(1)
         x = self.blocks(x)
         x = self.ln_f(x)
         x = self.proj(x)        #(b, num_tokens, output_dim)
 
         if y is None:
+            x = x.view(b, t, c, -1).mean(dim=-2)
             return x
 
         # logits1 = self.head1(x).view(-1, 2) #(b * num_tokens, 2)
@@ -217,13 +224,13 @@ class GPT(nn.Module):
         # loss2 = F.cross_entropy(logits2, label2, ignore_index=-100)
         # loss3 = F.cross_entropy(logits3, label3, ignore_index=-100)
 
-        pred = self.decoder(x[:, :-1])
-        l_regression = F.smooth_l1_loss(pred, tokens[:, 1:])
+        pred = self.decoder(x[:, :-c])
+        l_regression = F.smooth_l1_loss(pred, tokens.view(b, t * c, -1)[:, c:])
         x2 = self.blocks(x2)
         x2 = self.ln_f(x2)
         x2 = self.proj(x2)
-        pred2 = self.decoder(x2[:, :-1])
-        l_regression_RL = F.mse_loss(pred2, tokens.flip(1)[:, 1:])
+        pred2 = self.decoder(x2[:, :-c])
+        l_regression_RL = F.mse_loss(pred2, tokens.view(b, t * c, -1).flip(1)[:, c:])
         losses = {
             # 'loss1': loss1,
             # 'loss2': loss2,

@@ -98,7 +98,7 @@ class fly_aug_dataset_2(data.Dataset):
 
         keypoints = torch.flatten(keypoints, 2)         # (num_frame, 11, 48)
         keypoints = (keypoints - self.mean) / self.std
-        keypoints = torch.flatten(keypoints, 1)         # (num_frame, 528)
+        # keypoints = torch.flatten(keypoints, 1)         # (num_frame, 528)
         keypoints = torch.nan_to_num(keypoints, nan=0)
         ret.update({'keypoints': keypoints})
 
