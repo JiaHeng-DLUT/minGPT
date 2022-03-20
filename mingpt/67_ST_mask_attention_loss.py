@@ -164,6 +164,7 @@ class Trainer:
             if not is_train:
                 feats = torch.cat(feats, dim=0)
                 labels = torch.cat(labels, dim=0)
+                assert(feats.shape[0] == labels.shape[0])
                 return (feats, labels)
 
         if self.test_dataset is not None:

@@ -242,4 +242,5 @@ class GPT(nn.Module):
             'l_regression_RL': l_regression_RL,
         }
 
+        x = x.view(b, t, c, -1).mean(dim=-2)
         return x, losses
