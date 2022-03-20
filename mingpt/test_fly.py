@@ -12,16 +12,17 @@ import numpy as np
 import torch
 from torch.utils.data.dataloader import DataLoader
 
-from data.fly_dataset import FlyNormDataset
+from data.fly_aug_dataset_2 import fly_aug_dataset_2
 from model import GPT, GPT1Config
 from utils.misc import set_random_seed
 
 class TesterConfig:
     # model
-    input_dim = 528
+    input_dim = 48
     output_dim = 256
     total_frames = 4500
-    clip_frames = 150
+    clip_frames = 50
+    num_animals = 11
 
     # data
     test_dataset = {
@@ -40,9 +41,25 @@ class TesterConfig:
     # ckpt_path = f'./experiments/fly/41_lr_1e-5_194/epoch23.pth'
     # ckpt_path = f'./experiments/fly/43_lr_regression_bs32_lr_1e-5/epoch9.pth'
     # ckpt_path = f'./experiments/fly/44_lr_regression_bs32_lr_1e-6/epoch15.pth'
-    ckpt_path = f'./experiments/fly/45_lr_regression_lr_cosine/epoch17.pth'
+    # ckpt_path = f'./experiments/fly/49_reflection_vertical_p5e-1/epoch20.pth'
+    # ckpt_path = f'./experiments/fly/50_reflection_both_p5e-1/epoch21.pth'
+    # ckpt_path = f'./experiments/fly/51_translation_p5e-1/epoch20.pth'
+    # ckpt_path = f'./experiments/fly/52_rotation_p5e-1/epoch21.pth'
+    # ckpt_path = f'./experiments/fly/53_L1_loss/epoch20.pth'
+    # ckpt_path = f'./experiments/fly/54_smooth_L1_loss/epoch21.pth'
+    # ckpt_path = f'./experiments/fly/55_LR_RL/epoch21.pth'
+    # ckpt_path = f'./experiments/fly/56_LR_RL_w5e-1/epoch21.pth'
+    # ckpt_path = f'./experiments/fly/57_flip_LR_RL/epoch21.pth'
+    # ckpt_path = f'./experiments/fly/58_warmup/epoch21.pth'
+    # ckpt_path = f'./experiments/fly/59_tanh/epoch21.pth'
+    # ckpt_path = f'./experiments/fly/60_relu/epoch21.pth'
+    # ckpt_path = f'./experiments/fly/61_hflip_LR_RL_L2/epoch21.pth'
+    # ckpt_path = f'./experiments/fly/62_hflip_LR_RL_L2_tanh/epoch21.pth'
+    # ckpt_path = f'./experiments/fly/66_ST_mask_attention/epoch24.pth'
+    # ckpt_path = f'./experiments/fly/65_ST_wo_mask/epoch16.pth'
+    ckpt_path = f'./experiments/fly/65_ST_wo_mask_2/epoch16.pth'
     feat_path = ckpt_path.replace('.pth', '_submission.npy')
-    # CUDA_VISIBLE_DEVICES=3 python test_fly.py
+    # CUDA_VISIBLE_DEVICES=0 python test_fly.py
 
     def __init__(self, **kwargs):
         for k,v in kwargs.items():
@@ -130,6 +147,7 @@ class Tester:
             # place data on the correct device
             x = data['keypoints'].to(self.device)           #(b, clip_frame, 528)
             pos = data['pos']
+            # mask = data['mask'].to(self.device).long()
             id = data['id'][0]
             # print(pos, id)
             if id not in frame_number_map:
@@ -156,13 +174,14 @@ class Tester:
 if __name__ == '__main__':
     set_random_seed(0)
     config = TesterConfig()
-    test_set = FlyNormDataset(config.test_dataset)
+    test_set = fly_aug_dataset_2(config.test_dataset)
     print(len(test_set))
 
     gpt_config = GPT1Config(block_size=config.total_frames, 
         input_dim=config.input_dim, 
         output_dim=config.output_dim, 
-        num_tokens=config.clip_frames)
+        num_tokens=config.clip_frames,
+        num_animals=config.num_animals)
     model = GPT(gpt_config)
     print(model)
     # x = torch.randn((2, 4500, 528))
