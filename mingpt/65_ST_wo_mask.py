@@ -66,8 +66,8 @@ class TrainerConfig:
     }
 
     # checkpoint settings
-    ckpt_dir = f'./experiments/fly/65_ST_wo_mask'
-    # CUDA_VISIBLE_DEVICES=3 python 65_ST_wo_mask.py > experiments/fly/log/65_ST_wo_mask.log
+    ckpt_dir = f'./experiments/fly/65_ST_wo_mask_2'
+    # CUDA_VISIBLE_DEVICES=0 python 65_ST_wo_mask.py > experiments/fly/log/65_ST_wo_mask_2.log
 
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
@@ -163,6 +163,7 @@ class Trainer:
             if not is_train:
                 feats = torch.cat(feats, dim=0)
                 labels = torch.cat(labels, dim=0)
+                assert(feats.shape[0] == labels.shape[0])
                 return (feats, labels)
 
         if self.test_dataset is not None:
