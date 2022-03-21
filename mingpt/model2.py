@@ -213,7 +213,9 @@ class GPT(nn.Module):
         x = self.proj(x)        #(b, num_tokens, output_dim)
 
         if y is None:
-            x = x.view(b, t, c, -1).mean(dim=-2)
+            m = mask.view(b, t, c, 1)
+            x = x.view(b, t, c, -1)
+            x = (x * m).sum(dim=-2) / m.sum(dim=-2)
             return x
 
         # logits1 = self.head1(x).view(-1, 2) #(b * num_tokens, 2)
@@ -242,5 +244,7 @@ class GPT(nn.Module):
             'l_regression_RL': l_regression_RL,
         }
 
-        x = x.view(b, t, c, -1).mean(dim=-2)
+        m = mask.view(b, t, c, 1)
+        x = x.view(b, t, c, -1)
+        x = (x * m).sum(dim=-2) / m.sum(dim=-2)
         return x, losses
