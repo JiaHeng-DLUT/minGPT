@@ -122,7 +122,7 @@ class GPT(nn.Module):
         # self.head1 = nn.Linear(config.output_dim, 2, bias=False)
         # self.head2 = nn.Linear(config.output_dim, 2, bias=False)
         # self.head3 = nn.Linear(config.output_dim, 2, bias=False)
-
+        self.bn = nn.BatchNorm1d(config.input_dim)
         self.block_size = config.block_size
         self.apply(self._init_weights)
 
@@ -136,7 +136,7 @@ class GPT(nn.Module):
             module.weight.data.normal_(mean=0.0, std=0.02)
             if isinstance(module, nn.Linear) and module.bias is not None:
                 module.bias.data.zero_()
-        elif isinstance(module, nn.LayerNorm):
+        elif isinstance(module, (nn.LayerNorm, nn.BatchNorm1d)):
             module.bias.data.zero_()
             module.weight.data.fill_(1.0)
 
@@ -152,7 +152,7 @@ class GPT(nn.Module):
         decay = set()
         no_decay = set()
         whitelist_weight_modules = (torch.nn.Linear, )
-        blacklist_weight_modules = (torch.nn.LayerNorm, torch.nn.Embedding)
+        blacklist_weight_modules = (torch.nn.LayerNorm, torch.nn.Embedding, torch.nn.BatchNorm1d)
         for mn, m in self.named_modules():
             for pn, p in m.named_parameters():
                 fpn = '%s.%s' % (mn, pn) if mn else pn # full param name
@@ -191,6 +191,7 @@ class GPT(nn.Module):
         t = tokens.shape[1]
         assert t <= self.block_size, "Cannot forward, model block size is exhausted."
 
+        tokens = self.bn(tokens.transpose(-1, -2)).transpose(-1, -2)
         # forward the GPT model
         token_embeddings = self.tok_emb(tokens)
         position_embeddings = []
