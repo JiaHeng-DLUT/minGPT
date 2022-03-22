@@ -58,6 +58,8 @@ class CausalSelfAttention(nn.Module):
         a = (torch.tril(torch.ones(num_frame, num_frame))[:, :, None, None] * torch.eye(num_id)[None, None, :, :]).bool()
         b = (torch.eye(num_frame)[:, :, None, None] * torch.ones(num_id, num_id)[None, None, :, :]).bool()
         mask = (a | b).long().transpose(1, 2).reshape(num_frame * num_id, -1)[None, None, :, :]
+        print(mask)
+        assert(0)
         self.register_buffer("mask", mask)
         self.n_head = config.n_head
 
