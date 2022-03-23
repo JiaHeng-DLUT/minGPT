@@ -53,11 +53,10 @@ class CausalSelfAttention(nn.Module):
         # output projection
         self.proj = nn.Linear(config.n_embd, config.n_embd)
         # causal mask to ensure that attention is only applied to the left in the input sequence
-        num_frame = config.num_tokens
-        num_id = config.num_animals
-        a = torch.tril(torch.ones(num_frame, num_frame))[:, :, None, None]
-        b = torch.ones(1, 1, num_id, num_id)
-        mask = (a * b).transpose(1, 2).reshape(num_frame * num_id, -1)[None, None, :, :]
+        if config.mask_type == 'S':
+            mask = torch.ones(1, 1, config.num_animals + 1, config.num_animals + 1)
+        elif config.mask_type == 'T':
+            mask = torch.tril(torch.ones((config.num_tokens, config.num_tokens)).view(1, 1, config.num_tokens, config.num_tokens))
         self.register_buffer("mask", mask)
         self.n_head = config.n_head
 
@@ -103,31 +102,89 @@ class Block(nn.Module):
         x = x + self.mlp(self.ln2(x))
         return (x, mask)
 
+class SGPT(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+        # input embedding stem
+        self.tok_emb = nn.Linear(config.input_dim, config.n_embd)
+        self.cls_token = nn.Parameter(torch.zeros(1, 1, config.n_embd))
+        self.drop = nn.Dropout(config.embd_pdrop)
+        # transformer
+        config.mask_type = 'S'
+        self.blocks = nn.Sequential(*[Block(config) for _ in range(config.n_layer)])
+        # decoder head
+        self.ln_f = nn.LayerNorm(config.n_embd)
+        self.proj = nn.Linear(config.n_embd, config.n_embd)
+
+    def forward(self, tokens, mask):
+        (b, t, c, _) = tokens.shape
+        token_embeddings = self.tok_emb(tokens)
+        token_embeddings = token_embeddings.view(b * t, c, -1)
+        token_embeddings = torch.cat((self.cls_token.expand(b * t, -1, -1), token_embeddings), dim=1)
+        x = self.drop(token_embeddings)
+        x, _ = self.blocks((x, torch.cat((torch.ones(b * t, 1).to(mask), mask.view(b * t, c)), dim=1)))
+        x = self.ln_f(x)
+        x = self.proj(x)
+        return x.view(b, t, c + 1, -1)
+
+class TGPT(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+        self.pos_emb = nn.Parameter(torch.zeros(1, config.block_size, config.n_embd))
+        self.drop = nn.Dropout(config.embd_pdrop)
+        # transformer
+        config.mask_type = 'T'
+        self.blocks = nn.Sequential(*[Block(config) for _ in range(config.n_layer)])
+        # decoder head
+        self.ln_f = nn.LayerNorm(config.n_embd)
+        self.proj = nn.Linear(config.n_embd, config.output_dim)
+
+    def forward(self, feat1, pos, decode=False):
+        (b, t, _) = feat1.shape
+        position_embeddings = []
+        for i in range(b):
+            position_embeddings.append(self.pos_emb[:, pos[i] : pos[i] + self.config.num_tokens, :])
+        position_embeddings = torch.cat(position_embeddings, dim=0)
+        x = (feat1 + position_embeddings)
+        x2 = x.flip(1)
+        x = self.drop(x)
+        x, _ = self.blocks((x, torch.ones((b, t)).to(x)))
+        x = self.ln_f(x)
+        x = self.proj(x)
+        x2 = self.drop(x2)
+        x2, _ = self.blocks((x2, torch.ones((b, t)).to(x2)))
+        x2 = self.ln_f(x2)
+        x2 = self.proj(x2)
+        return x, x2
+
 class GPT(nn.Module):
     """  the full GPT language model, with a context size of block_size """
 
     def __init__(self, config):
         super().__init__()
-
-        # input embedding stem
         self.config = config
-        self.tok_emb = nn.Linear(config.input_dim, config.n_embd)
-        self.pos_emb = nn.Parameter(torch.zeros(1, config.block_size, config.n_embd))
-        self.drop = nn.Dropout(config.embd_pdrop)
-        # transformer
-        self.blocks = nn.Sequential(*[Block(config) for _ in range(config.n_layer)])
-        # decoder head
-        self.ln_f = nn.LayerNorm(config.n_embd)
-        self.proj = nn.Linear(config.n_embd, config.output_dim)
-        self.decoder = nn.Sequential(
+        self.sgpt = SGPT(config)
+        self.tgpt = TGPT(config)
+        self.decoder_animal_prev = nn.Sequential(
+            nn.Linear(config.n_embd, config.n_embd),
+            nn.Tanh(),
+            nn.LayerNorm(config.n_embd),
+            nn.Linear(config.n_embd, config.input_dim)
+        )
+        self.decoder_animal_next = nn.Sequential(
+            nn.Linear(config.n_embd, config.n_embd),
+            nn.Tanh(),
+            nn.LayerNorm(config.n_embd),
+            nn.Linear(config.n_embd, config.input_dim)
+        )
+        self.decoder_frame = nn.Sequential(
             nn.Linear(config.output_dim, config.output_dim),
             nn.Tanh(),
             nn.LayerNorm(config.output_dim),
-            nn.Linear(config.output_dim, config.input_dim)
+            nn.Linear(config.output_dim, config.input_dim * config.num_animals)
         )
-        # self.head1 = nn.Linear(config.output_dim, 2, bias=False)
-        # self.head2 = nn.Linear(config.output_dim, 2, bias=False)
-        # self.head3 = nn.Linear(config.output_dim, 2, bias=False)
 
         self.block_size = config.block_size
         self.apply(self._init_weights)
@@ -174,7 +231,8 @@ class GPT(nn.Module):
                     no_decay.add(fpn)
 
         # special case the position embedding parameter in the root GPT module as not decayed
-        no_decay.add('pos_emb')
+        no_decay.add('sgpt.cls_token')
+        no_decay.add('tgpt.pos_emb')
 
         # validate that we considered every parameter
         param_dict = {pn: p for pn, p in self.named_parameters()}
@@ -192,55 +250,7 @@ class GPT(nn.Module):
         optimizer = torch.optim.AdamW(optim_groups, lr=train_config.learning_rate, betas=train_config.betas)
         return optimizer
 
-    def forward(self, tokens, pos, mask, y=None):
-        b = tokens.shape[0]
-        t = tokens.shape[1]
-        c = tokens.shape[2]
-        assert t <= self.block_size, "Cannot forward, model block size is exhausted."
-
-        # forward the GPT model
-        token_embeddings = self.tok_emb(tokens)
-        position_embeddings = []
-        for i in range(b):
-            position_embeddings.append(self.pos_emb[:, pos[i] : pos[i] + self.config.num_tokens, :])
-        position_embeddings = torch.cat(position_embeddings, dim=0)[:, :, None, :]
-
-        embeddings = (token_embeddings + position_embeddings).view(b, t * c, -1)
-        x = self.drop(embeddings)
-        x2 = x.flip(1)
-        x, _ = self.blocks((x, mask))
-        x = self.ln_f(x)
-        x = self.proj(x)        #(b, num_tokens, output_dim)
-
-        if y is None:
-            x = x.view(b, t, c, -1).mean(dim=-2)
-            return x
-
-        # logits1 = self.head1(x).view(-1, 2) #(b * num_tokens, 2)
-        # logits2 = self.head2(x).view(-1, 2)
-        # logits3 = self.head3(x).view(-1, 2)
-        # label1 = y[:, 0].reshape(-1)
-        # label2 = y[:, 1].reshape(-1)
-        # label3 = y[:, 2].reshape(-1)
-        # loss1 = F.cross_entropy(logits1, label1, ignore_index=-100)
-        # loss2 = F.cross_entropy(logits2, label2, ignore_index=-100)
-        # loss3 = F.cross_entropy(logits3, label3, ignore_index=-100)
-
-        tokens = tokens.view(b, t * c, -1) * mask[:, :, None]
-        pred = self.decoder(x) * mask[:, :, None]
-        l_regression = F.smooth_l1_loss(pred[:, :-c], tokens[:, c:])
-        x2, _ = self.blocks((x2, mask.flip(-1)))
-        x2 = self.ln_f(x2)
-        x2 = self.proj(x2)
-        pred2 = self.decoder(x2) * mask[:, :, None]
-        l_regression_RL = F.mse_loss(pred2[:, :-c], tokens.flip(1)[:, c:])
-        losses = {
-            # 'loss1': loss1,
-            # 'loss2': loss2,
-            # 'loss3': loss3,
-            'l_regression': l_regression,
-            'l_regression_RL': l_regression_RL,
-        }
-
-        x = x.view(b, t, c, -1).mean(dim=-2)
-        return x, losses
+    def forward(self, tokens, pos, mask):
+        feat1 = self.sgpt(tokens, mask)
+        feat2_LR, feat2_RL = self.tgpt(feat1[:, :, 0], pos)
+        return feat1[:, :, 1:], feat2_LR, feat2_RL

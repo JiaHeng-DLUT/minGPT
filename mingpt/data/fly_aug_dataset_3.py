@@ -97,7 +97,7 @@ class fly_aug_dataset_3(data.Dataset):
                 keypoints[:, :, 20, 1] = torch.sin(angle)
 
         keypoints = torch.flatten(keypoints, 2)         # (num_frame, 11, 48)
-        mask = ~(torch.isnan(keypoints).long().sum(-1).bool()).view(-1)
+        mask = ~(torch.isnan(keypoints).long().sum(-1).bool())
         ret.update({'mask': mask})
         keypoints = (keypoints - self.mean) / self.std
         # keypoints = torch.flatten(keypoints, 1)         # (num_frame, 528)
