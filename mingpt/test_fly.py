@@ -13,7 +13,7 @@ import torch
 from torch.utils.data.dataloader import DataLoader
 
 from data.fly_aug_dataset_3 import fly_aug_dataset_3
-from model2 import GPT, GPT1Config
+from model3 import GPT, GPT1Config
 from utils.misc import set_random_seed
 
 class TesterConfig:
@@ -41,9 +41,10 @@ class TesterConfig:
     # ckpt_path = f'./experiments/fly/41_lr_1e-5_194/epoch23.pth'
     # ckpt_path = f'./experiments/fly/43_lr_regression_bs32_lr_1e-5/epoch9.pth'
     # ckpt_path = f'./experiments/fly/44_lr_regression_bs32_lr_1e-6/epoch15.pth'
-    ckpt_path = f'./experiments/fly/67_ST_mask_attention_loss/epoch16.pth'
+    # ckpt_path = f'./experiments/fly/70_ST_msak_attention_loss_result/epoch21.pth'
+    ckpt_path = f'./experiments/fly/74_spatial_temporal_transformer_cat/epoch25.pth'
     feat_path = ckpt_path.replace('.pth', '_submission.npy')
-    # CUDA_VISIBLE_DEVICES=0 python test_fly.py
+    # CUDA_VISIBLE_DEVICES=3 python test_fly.py
 
     def __init__(self, **kwargs):
         for k,v in kwargs.items():
@@ -140,7 +141,8 @@ class Tester:
                 frame_number_map[id] = (st, ed)
             # forward the model
             with torch.set_grad_enabled(is_train):
-                feat = model(x, pos, mask, y=None).view(-1, self.config.output_dim).cpu()
+                feat1, feat2_LR, feat2_RL = self.model(x, pos, mask)
+                feat = feat2_LR.view(-1, self.config.output_dim).cpu()
             feats.append(feat)
         feats = torch.cat(feats, dim=0).numpy()
         # print(1, feats.shape)
