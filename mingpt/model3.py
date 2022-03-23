@@ -56,7 +56,8 @@ class CausalSelfAttention(nn.Module):
         if config.mask_type == 'S':
             mask = torch.ones(1, 1, config.num_animals, config.num_animals)
         elif config.mask_type == 'T':
-            mask = torch.tril(torch.ones((config.num_tokens, config.num_tokens)).view(1, 1, config.num_tokens, config.num_tokens))
+            # mask = torch.tril(torch.ones((config.num_tokens, config.num_tokens)).view(1, 1, config.num_tokens, config.num_tokens))
+            mask = torch.ones((config.num_tokens, config.num_tokens)).view(1, 1, config.num_tokens, config.num_tokens)
         self.register_buffer("mask", mask)
         self.n_head = config.n_head
 
