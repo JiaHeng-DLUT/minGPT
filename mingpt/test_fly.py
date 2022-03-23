@@ -43,7 +43,7 @@ class TesterConfig:
     # ckpt_path = f'./experiments/fly/44_lr_regression_bs32_lr_1e-6/epoch15.pth'
     # ckpt_path = f'./experiments/fly/70_ST_msak_attention_loss_result/epoch21.pth'
     ckpt_path = f'./experiments/fly/74_spatial_temporal_transformer_cat/epoch25.pth'
-    feat_path = ckpt_path.replace('.pth', '_submission.npy')
+    feat_path = ckpt_path.replace('.pth', '_submission2.npy')
     # CUDA_VISIBLE_DEVICES=3 python test_fly.py
 
     def __init__(self, **kwargs):
@@ -142,7 +142,7 @@ class Tester:
             # forward the model
             with torch.set_grad_enabled(is_train):
                 feat1, feat2_LR, feat2_RL = self.model(x, pos, mask)
-                feat = feat2_LR.view(-1, self.config.output_dim).cpu()
+                feat = ((feat2_LR + feat2_RL) / 2.).view(-1, self.config.output_dim).cpu()
             feats.append(feat)
         feats = torch.cat(feats, dim=0).numpy()
         # print(1, feats.shape)
