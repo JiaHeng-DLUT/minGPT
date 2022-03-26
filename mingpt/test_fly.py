@@ -12,7 +12,7 @@ import numpy as np
 import torch
 from torch.utils.data.dataloader import DataLoader
 
-from data.fly_dataset import FlyNormDataset
+from data.fly_aug_dataset_2 import fly_aug_dataset_2
 from model import GPT, GPT1Config
 from utils.misc import set_random_seed
 
@@ -40,9 +40,11 @@ class TesterConfig:
     # ckpt_path = f'./experiments/fly/41_lr_1e-5_194/epoch23.pth'
     # ckpt_path = f'./experiments/fly/43_lr_regression_bs32_lr_1e-5/epoch9.pth'
     # ckpt_path = f'./experiments/fly/44_lr_regression_bs32_lr_1e-6/epoch15.pth'
-    ckpt_path = f'./experiments/fly/45_lr_regression_lr_cosine/epoch17.pth'
+    # ckpt_path = f'./experiments/fly/45_lr_regression_lr_cosine/epoch17.pth'
+    # ckpt_path = f'./experiments/fly/68_tanh_mse_fix_warmup/epoch21.pth'
+    ckpt_path = f'./experiments/fly/72_bn/epoch3.pth'
     feat_path = ckpt_path.replace('.pth', '_submission.npy')
-    # CUDA_VISIBLE_DEVICES=3 python test_fly.py
+    # CUDA_VISIBLE_DEVICES=0 python test_fly.py
 
     def __init__(self, **kwargs):
         for k,v in kwargs.items():
@@ -156,7 +158,7 @@ class Tester:
 if __name__ == '__main__':
     set_random_seed(0)
     config = TesterConfig()
-    test_set = FlyNormDataset(config.test_dataset)
+    test_set = fly_aug_dataset_2(config.test_dataset)
     print(len(test_set))
 
     gpt_config = GPT1Config(block_size=config.total_frames, 
