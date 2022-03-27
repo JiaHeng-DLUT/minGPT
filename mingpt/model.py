@@ -112,7 +112,16 @@ class GPT(nn.Module):
         self.blocks = nn.Sequential(*[Block(config) for _ in range(config.n_layer)])
         # decoder head
         self.ln_f = nn.LayerNorm(config.n_embd)
-        self.proj = nn.Linear(config.n_embd, config.output_dim)
+        prev_dim = config.n_embd
+        dim = config.output_dim
+        self.proj = nn.Sequential(nn.Linear(prev_dim, prev_dim, bias=False),
+                                    nn.BatchNorm1d(prev_dim),
+                                    nn.ReLU(inplace=True), # first layer
+                                    nn.Linear(prev_dim, prev_dim, bias=False),
+                                    nn.BatchNorm1d(prev_dim),
+                                    nn.ReLU(inplace=True), # second layer
+                                    nn.Linear(prev_dim, dim, bias=False), # hack: not use bias as it is followed by BN
+                                    nn.BatchNorm1d(dim, affine=False)) # output layer
         self.decoder = nn.Sequential(
             nn.Linear(config.output_dim, config.output_dim),
             nn.Tanh(),
@@ -122,7 +131,7 @@ class GPT(nn.Module):
         # self.head1 = nn.Linear(config.output_dim, 2, bias=False)
         # self.head2 = nn.Linear(config.output_dim, 2, bias=False)
         # self.head3 = nn.Linear(config.output_dim, 2, bias=False)
-        self.bn = nn.BatchNorm1d(config.input_dim)
+        # self.bn = nn.BatchNorm1d(config.input_dim)
         self.block_size = config.block_size
         self.apply(self._init_weights)
 
@@ -137,8 +146,10 @@ class GPT(nn.Module):
             if isinstance(module, nn.Linear) and module.bias is not None:
                 module.bias.data.zero_()
         elif isinstance(module, (nn.LayerNorm, nn.BatchNorm1d)):
-            module.bias.data.zero_()
-            module.weight.data.fill_(1.0)
+            if module.bias is not None:
+                module.bias.data.zero_()
+            if module.weight is not None:
+                module.weight.data.fill_(1.0)
 
     def configure_optimizers(self, train_config):
         """
@@ -191,7 +202,7 @@ class GPT(nn.Module):
         t = tokens.shape[1]
         assert t <= self.block_size, "Cannot forward, model block size is exhausted."
 
-        tokens = self.bn(tokens.transpose(-1, -2)).transpose(-1, -2)
+        # tokens = self.bn(tokens.transpose(-1, -2)).transpose(-1, -2)
         # forward the GPT model
         token_embeddings = self.tok_emb(tokens)
         position_embeddings = []
@@ -203,7 +214,7 @@ class GPT(nn.Module):
         x2 = x.flip(1)
         x = self.blocks(x)
         x = self.ln_f(x)
-        x = self.proj(x)        #(b, num_tokens, output_dim)
+        x = self.proj(x.view(b * t, -1)).view(b, t, -1)        #(b, num_tokens, output_dim)
 
         if y is None:
             return x
@@ -222,7 +233,7 @@ class GPT(nn.Module):
         l_regression = F.mse_loss(pred, tokens[:, 1:])
         x2 = self.blocks(x2)
         x2 = self.ln_f(x2)
-        x2 = self.proj(x2)
+        x2 = self.proj(x2.view(b * t, -1)).view(b, t, -1)
         pred2 = self.decoder(x2[:, :-1])
         l_regression_RL = F.mse_loss(pred2, tokens.flip(1)[:, 1:])
         losses = {
