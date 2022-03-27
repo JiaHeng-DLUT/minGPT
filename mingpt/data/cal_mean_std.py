@@ -1,7 +1,7 @@
 import numpy as np
 
 
-data_path = '../../Fruit_Fly_Groups/Notebooks/data/user_train.npy'
+data_path = '../../Mouse_Triplets/Notebooks/data/user_train.npy'
 user_train = np.load(data_path, allow_pickle=True).item()
 seqs = user_train['sequences']
 keypoints = []
