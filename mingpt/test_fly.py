@@ -102,7 +102,15 @@ def validate_submission(submission, submission_clips):
 class Tester:
 
     def __init__(self, model, test_dataset, config):
-        model.load_state_dict(torch.load(config.ckpt_path))
+        state_dict = torch.load(config.ckpt_path)
+        for k in state_dict:
+            if k.startswith('tgpt.blocks.') and k.endswith('.attn.mask'):
+                print(k)
+                state_dict[k] = torch.ones_like(state_dict[k])
+        for k in state_dict:
+            if k.startswith('tgpt.blocks.') and k.endswith('.attn.mask'):
+                print(k, state_dict[k])
+        model.load_state_dict(state_dict)
         self.model = model
         self.test_dataset = test_dataset
         self.config = config
