@@ -96,16 +96,13 @@ class Tester:
 
     def __init__(self, model, test_dataset, config):
         state_dict = torch.load(config.ckpt_path)
-        print(state_dict.keys())
         for k in state_dict:
-            if k.endswith('mask'):
-                print(state_dict[k])
-        for k in state_dict:
-            if k.endswith('mask'):
+            if k.startswith('tgpt.blocks.') and k.endswith('.attn.mask'):
+                print(k)
                 state_dict[k] = torch.ones_like(state_dict[k])
         for k in state_dict:
-            if k.endswith('mask'):
-                print(state_dict[k])
+            if k.startswith('tgpt.blocks.') and k.endswith('.attn.mask'):
+                print(k, state_dict[k])
         model.load_state_dict(state_dict)
         self.model = model
         self.test_dataset = test_dataset
@@ -145,7 +142,8 @@ class Tester:
                 frame_number_map[id] = (st, ed)
             # forward the model
             with torch.set_grad_enabled(is_train):
-                feat = model(x, pos, mask, y=None).view(-1, self.config.output_dim).cpu()
+                feat1, feat2_LR, feat2_RL = self.model(x, pos, mask)
+                feat = feat2_LR.view(-1, self.config.output_dim).cpu()
             feats.append(feat)
         feats = torch.cat(feats, dim=0).numpy()
         # print(1, feats.shape)
