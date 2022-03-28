@@ -31,7 +31,7 @@ class GPT1Config(GPTConfig):
     """ GPT-1 like network roughly 125M params """
     n_layer = 12
     n_head = 12
-    n_embd = 768
+    n_embd = 48
 
 class CausalSelfAttention(nn.Module):
     """
@@ -53,11 +53,16 @@ class CausalSelfAttention(nn.Module):
         # output projection
         self.proj = nn.Linear(config.n_embd, config.n_embd)
         # causal mask to ensure that attention is only applied to the left in the input sequence
-        self.register_buffer("mask", torch.tril(torch.ones(config.block_size, config.block_size))
-                                     .view(1, 1, config.block_size, config.block_size))
+        num_frame = config.num_tokens
+        num_id = config.num_animals
+        a = torch.tril(torch.ones(num_frame, num_frame))[:, :, None, None]
+        b = torch.ones(1, 1, num_id, num_id)
+        mask = (a * b).transpose(1, 2).reshape(num_frame * num_id, -1)[None, None, :, :]
+        self.register_buffer("mask", mask)
+        print(self.mask.tolist())
         self.n_head = config.n_head
 
-    def forward(self, x, layer_past=None):
+    def forward(self, x, mask, layer_past=None):
         B, T, C = x.size()
 
         # calculate query, key, values for all heads in batch and move head forward to be the batch dim
@@ -67,7 +72,8 @@ class CausalSelfAttention(nn.Module):
 
         # causal self-attention; Self-attend: (B, nh, T, hs) x (B, nh, hs, T) -> (B, nh, T, T)
         att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
-        att = att.masked_fill(self.mask[:,:,:T,:T] == 0, float('-inf'))
+        m = self.mask * mask[:, None, None, :]
+        att = att.masked_fill(m == 0, float('-inf'))
         att = F.softmax(att, dim=-1)
         att = self.attn_drop(att)
         y = att @ v # (B, nh, T, T) x (B, nh, T, hs) -> (B, nh, T, hs)
@@ -92,10 +98,11 @@ class Block(nn.Module):
             nn.Dropout(config.resid_pdrop),
         )
 
-    def forward(self, x):
-        x = x + self.attn(self.ln1(x))
+    def forward(self, inp):
+        (x, mask) = inp
+        x = x + self.attn(self.ln1(x), mask)
         x = x + self.mlp(self.ln2(x))
-        return x
+        return (x, mask)
 
 class GPT(nn.Module):
     """  the full GPT language model, with a context size of block_size """
@@ -118,6 +125,12 @@ class GPT(nn.Module):
             nn.Tanh(),
             nn.LayerNorm(config.output_dim),
             nn.Linear(config.output_dim, config.input_dim)
+        )
+        self.frame_decoder = nn.Sequential(
+            nn.Linear(config.output_dim, config.output_dim),
+            nn.Tanh(),
+            nn.LayerNorm(config.output_dim),
+            nn.Linear(config.output_dim, config.input_dim * config.num_animals)
         )
         # self.head1 = nn.Linear(config.output_dim, 2, bias=False)
         # self.head2 = nn.Linear(config.output_dim, 2, bias=False)
@@ -186,9 +199,10 @@ class GPT(nn.Module):
         optimizer = torch.optim.AdamW(optim_groups, lr=train_config.learning_rate, betas=train_config.betas)
         return optimizer
 
-    def forward(self, tokens, pos, y=None):
+    def forward(self, tokens, pos, mask, y=None):
         b = tokens.shape[0]
         t = tokens.shape[1]
+        c = tokens.shape[2]
         assert t <= self.block_size, "Cannot forward, model block size is exhausted."
 
         # forward the GPT model
@@ -196,15 +210,17 @@ class GPT(nn.Module):
         position_embeddings = []
         for i in range(b):
             position_embeddings.append(self.pos_emb[:, pos[i] : pos[i] + self.config.num_tokens, :])
-        position_embeddings = torch.cat(position_embeddings, dim=0)
-        
-        x = self.drop(token_embeddings + position_embeddings)
+        position_embeddings = torch.cat(position_embeddings, dim=0)[:, :, None, :]
+
+        embeddings = (token_embeddings + position_embeddings).view(b, t * c, -1)
+        x = self.drop(embeddings)
         x2 = x.flip(1)
-        x = self.blocks(x)
+        x, _ = self.blocks((x, mask))
         x = self.ln_f(x)
         x = self.proj(x)        #(b, num_tokens, output_dim)
 
         if y is None:
+            x = x.view(b, t, c, -1).mean(dim=-2)
             return x
 
         # logits1 = self.head1(x).view(-1, 2) #(b * num_tokens, 2)
@@ -217,19 +233,34 @@ class GPT(nn.Module):
         # loss2 = F.cross_entropy(logits2, label2, ignore_index=-100)
         # loss3 = F.cross_entropy(logits3, label3, ignore_index=-100)
 
-        pred = self.decoder(x[:, :-1])
-        l_regression = F.mse_loss(pred, tokens[:, 1:])
-        x2 = self.blocks(x2)
+        # animal LR
+        tokens = tokens.view(b, t * c, -1) * mask[:, :, None]
+        pred = self.decoder(x) * mask[:, :, None]
+        l_regression = F.mse_loss(pred[:, :-c], tokens[:, c:])
+        # animal RL
+        x2, _ = self.blocks((x2, mask.flip(-1)))
         x2 = self.ln_f(x2)
         x2 = self.proj(x2)
-        pred2 = self.decoder(x2[:, :-1])
-        l_regression_RL = F.mse_loss(pred2, tokens.flip(1)[:, 1:])
+        pred2 = self.decoder(x2) * mask[:, :, None]
+        l_regression_RL = F.mse_loss(pred2[:, :-c], tokens.flip(1)[:, c:])
+        # frame LR
+        pred_frame_lr = self.frame_decoder(x.view(b, t, c, -1).mean(dim=-2))[:, :-1]
+        target_frame_lr = tokens.view(b, t, -1)[:, 1:]
+        l_frame_lr = F.mse_loss(pred_frame_lr, target_frame_lr)
+        # frame RL
+        pred_frame_rl = self.frame_decoder(x2.view(b, t, c, -1).mean(dim=-2))[:, :-1]
+        target_frame_rl = tokens.view(b, t, -1).flip(1)[:, 1:]
+        l_frame_rl = F.mse_loss(pred_frame_rl, target_frame_rl)
+
         losses = {
             # 'loss1': loss1,
             # 'loss2': loss2,
             # 'loss3': loss3,
             'l_regression': l_regression,
             'l_regression_RL': l_regression_RL,
+            'l_frame_lr': l_frame_lr,
+            'l_frame_rl': l_frame_rl,
         }
 
+        x = x.view(b, t, c, -1).mean(dim=-2)
         return x, losses

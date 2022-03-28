@@ -85,8 +85,10 @@ class mouse_aug_dataset_2(data.Dataset):
                 keypoints = keypoints @ R
 
         keypoints = torch.flatten(keypoints, 2)         # (num_frame, 3, 24)
+        mask = ~(torch.isnan(keypoints).long().sum(-1).bool()).view(-1)
+        ret.update({'mask': mask})
         keypoints = (keypoints - self.mean) / self.std
-        keypoints = torch.flatten(keypoints, 1)         # (num_frame, 72)
+        # keypoints = torch.flatten(keypoints, 1)         # (num_frame, 72)
         keypoints = torch.nan_to_num(keypoints, nan=0)
         ret.update({'keypoints': keypoints})
 

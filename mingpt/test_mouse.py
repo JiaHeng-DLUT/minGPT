@@ -21,7 +21,8 @@ class TesterConfig:
     input_dim = 3 * 12 * 2
     output_dim = 128
     total_frames = 1800
-    clip_frames = 150
+    clip_frames = 50
+    num_animals = 11
 
     # data
     test_dataset = {
@@ -135,6 +136,7 @@ class Tester:
             # place data on the correct device
             x = data['keypoints'].to(self.device)           #(b, clip_frame, 528)
             pos = data['pos']
+            mask = data['mask'].to(self.device).long()
             id = data['id'][0]
             # print(pos, id)
             if id not in frame_number_map:
@@ -143,7 +145,7 @@ class Tester:
                 frame_number_map[id] = (st, ed)
             # forward the model
             with torch.set_grad_enabled(is_train):
-                feat = model(x, pos, y=None).view(-1, self.config.output_dim).cpu()
+                feat = model(x, pos, mask, y=None).view(-1, self.config.output_dim).cpu()
             feats.append(feat)
         feats = torch.cat(feats, dim=0).numpy()
         # print(1, feats.shape)
@@ -167,7 +169,8 @@ if __name__ == '__main__':
     gpt_config = GPT1Config(block_size=config.total_frames, 
         input_dim=config.input_dim, 
         output_dim=config.output_dim, 
-        num_tokens=config.clip_frames)
+        num_tokens=config.clip_frames,
+        num_animals=config.num_animals)
     model = GPT(gpt_config)
     print(model)
     # x = torch.randn((2, 4500, 528))
