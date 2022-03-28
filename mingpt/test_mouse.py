@@ -35,7 +35,7 @@ class TesterConfig:
 
     # checkpoint setting
     ckpt_path = f'./experiments/fly/m00_baseline/epoch26.pth'
-    feat_path = ckpt_path.replace('.pth', '_submission.npy')
+    feat_path = ckpt_path.replace('.pth', '_submission_wo_mask.npy')
     # CUDA_VISIBLE_DEVICES=3 python test_fly.py
 
     def __init__(self, **kwargs):
@@ -94,7 +94,18 @@ def validate_submission(submission, submission_clips):
 class Tester:
 
     def __init__(self, model, test_dataset, config):
-        model.load_state_dict(torch.load(config.ckpt_path))
+        state_dict = torch.load(config.ckpt_path)
+        print(state_dict.keys())
+        for k in state_dict:
+            if k.endswith('mask'):
+                print(state_dict[k])
+        for k in state_dict:
+            if k.endswith('mask'):
+                state_dict[k] = torch.ones_like(state_dict[k])
+        for k in state_dict:
+            if k.endswith('mask'):
+                print(state_dict[k])
+        model.load_state_dict(state_dict)
         self.model = model
         self.test_dataset = test_dataset
         self.config = config
