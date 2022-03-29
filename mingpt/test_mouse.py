@@ -12,17 +12,17 @@ import numpy as np
 import torch
 from torch.utils.data.dataloader import DataLoader
 
-from data.mouse_aug_dataset_2 import mouse_aug_dataset_2
-from model import GPT, GPT1Config
+from data.mouse_aug_dataset_3 import mouse_aug_dataset_3
+from model3 import GPT, GPT1Config
 from utils.misc import set_random_seed
 
 class TesterConfig:
     # model
-    input_dim = 3 * 12 * 2
+    input_dim = 12 * 2
     output_dim = 128
     total_frames = 1800
     clip_frames = 50
-    num_animals = 11
+    num_animals = 3
 
     # data
     test_dataset = {
@@ -35,9 +35,9 @@ class TesterConfig:
     num_workers = 4
 
     # checkpoint setting
-    ckpt_path = f'./experiments/fly/m00_baseline/epoch26.pth'
+    ckpt_path = f'./experiments/fly/m03_ST_transformer/epoch24.pth'
     feat_path = ckpt_path.replace('.pth', '_submission_wo_mask.npy')
-    # CUDA_VISIBLE_DEVICES=3 python test_fly.py
+    # CUDA_VISIBLE_DEVICES=0 python test_mouse.py
 
     def __init__(self, **kwargs):
         for k,v in kwargs.items():
@@ -161,7 +161,7 @@ class Tester:
 if __name__ == '__main__':
     set_random_seed(0)
     config = TesterConfig()
-    test_set = mouse_aug_dataset_2(config.test_dataset)
+    test_set = mouse_aug_dataset_3(config.test_dataset)
     print(len(test_set))
 
     gpt_config = GPT1Config(block_size=config.total_frames, 
