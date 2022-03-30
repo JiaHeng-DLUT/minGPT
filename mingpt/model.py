@@ -29,7 +29,7 @@ class GPTConfig:
 
 class GPT1Config(GPTConfig):
     """ GPT-1 like network roughly 125M params """
-    n_layer = 12
+    n_layer = 6
     n_head = 12
     n_embd = 48
 
