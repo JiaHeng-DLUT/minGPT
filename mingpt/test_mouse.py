@@ -13,7 +13,7 @@ import torch
 from torch.utils.data.dataloader import DataLoader
 
 from data.mouse_aug_dataset_2 import mouse_aug_dataset_2
-from model import GPT, GPT1Config
+from model2 import GPT, GPT1Config
 from utils.misc import set_random_seed
 
 class TesterConfig:
@@ -35,7 +35,7 @@ class TesterConfig:
     num_workers = 4
 
     # checkpoint setting
-    ckpt_path = f'./experiments/fly/m01_ST_mask/epoch21.pth'
+    ckpt_path = f'./experiments/fly/m05_BN_last/epoch21.pth'
     feat_path = ckpt_path.replace('.pth', '_submission_wo_mask.npy')
     # CUDA_VISIBLE_DEVICES=0 python test_mouse.py
 
