@@ -12,8 +12,8 @@ import numpy as np
 import torch
 from torch.utils.data.dataloader import DataLoader
 
-from data.mouse_aug_dataset_2 import mouse_aug_dataset_2
-from model import GPT, GPT1Config
+from data.mouse_aug_dataset_4 import mouse_aug_dataset_4
+from model5 import GPT, GPT1Config
 from utils.misc import set_random_seed
 
 class TesterConfig:
@@ -26,16 +26,17 @@ class TesterConfig:
 
     # data
     test_dataset = {
-        'data_path': '../../Mouse_Triplets/Notebooks/data/submission_data.npy',
+        'data_path': ['../../Mouse_Triplets/Notebooks/data/submission_data.npy'],
         'meta_path': 'meta_info/mouse_meta_info_test.txt',
         'num_frame': clip_frames,
         'total_frame': total_frames,
+        'train': True,
     }
     batch_size = int(total_frames // clip_frames)
     num_workers = 4
 
     # checkpoint setting
-    ckpt_path = f'./experiments/fly/m01_ST_mask/epoch21.pth'
+    ckpt_path = f'./experiments/fly/m09_test_set/epoch21.pth'
     feat_path = ckpt_path.replace('.pth', '_submission_wo_mask.npy')
     # CUDA_VISIBLE_DEVICES=0 python test_mouse.py
 
@@ -145,7 +146,8 @@ class Tester:
                 frame_number_map[id] = (st, ed)
             # forward the model
             with torch.set_grad_enabled(is_train):
-                feat = model(x, pos, mask, y=None).view(-1, self.config.output_dim).cpu()
+                feat, _ = model(x, pos, mask)
+                feat = feat.view(-1, self.config.output_dim).cpu()
             feats.append(feat)
         feats = torch.cat(feats, dim=0).numpy()
         # print(1, feats.shape)
@@ -155,7 +157,7 @@ class Tester:
             "frame_number_map": frame_number_map, 
             "embeddings": feats
         }
-        submission_clips = np.load(self.config.test_dataset['data_path'], allow_pickle=True).item()
+        submission_clips = np.load(self.config.test_dataset['data_path'][0], allow_pickle=True).item()
         validate_submission(submission_dict, submission_clips)
         np.save(self.config.feat_path, submission_dict)
 
@@ -163,7 +165,7 @@ class Tester:
 if __name__ == '__main__':
     set_random_seed(0)
     config = TesterConfig()
-    test_set = mouse_aug_dataset_2(config.test_dataset)
+    test_set = mouse_aug_dataset_4(config.test_dataset)
     print(len(test_set))
 
     gpt_config = GPT1Config(block_size=config.total_frames, 
