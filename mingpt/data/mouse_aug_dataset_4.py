@@ -55,7 +55,10 @@ class mouse_aug_dataset_4(data.Dataset):
 
         id = self.id_list[index // self.num_clip]
         ret.update({'id': id})
-        pos = index % self.num_clip * self.num_frame
+        if self.opt['train']:
+            pos = np.random.randint(0, self.opt['total_frame'] - self.opt['num_frame'] + 1)
+        else:
+            pos = index % self.num_clip * self.num_frame
         ret.update({'pos': pos})
 
         keypoints = torch.from_numpy(self.seqs[id]['keypoints'][pos : pos + self.num_frame])    # (num_frame, 11, 24, 2)

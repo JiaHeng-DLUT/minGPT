@@ -31,7 +31,7 @@ class GPT1Config(GPTConfig):
     """ GPT-1 like network roughly 125M params """
     n_layer = 12
     n_head = 12
-    n_embd = 48
+    n_embd = 768
 
 class CausalSelfAttention(nn.Module):
     """
@@ -113,7 +113,6 @@ class GPT(nn.Module):
         # input embedding stem
         self.config = config
         self.tok_emb = nn.Linear(config.input_dim, config.n_embd)
-        self.pos_emb = nn.Parameter(torch.zeros(1, config.block_size, config.n_embd))
         self.drop = nn.Dropout(config.embd_pdrop)
         # transformer
         self.blocks = nn.Sequential(*[Block(config) for _ in range(config.n_layer)])
@@ -180,9 +179,6 @@ class GPT(nn.Module):
                     # weights of blacklist modules will NOT be weight decayed
                     no_decay.add(fpn)
 
-        # special case the position embedding parameter in the root GPT module as not decayed
-        no_decay.add('pos_emb')
-
         # validate that we considered every parameter
         param_dict = {pn: p for pn, p in self.named_parameters()}
         inter_params = decay & no_decay
@@ -207,12 +203,7 @@ class GPT(nn.Module):
 
         # forward the GPT model
         token_embeddings = self.tok_emb(self.bn(tokens.permute(0, 3, 1, 2)).permute(0, 2, 3, 1))
-        position_embeddings = []
-        for i in range(b):
-            position_embeddings.append(self.pos_emb[:, pos[i] : pos[i] + self.config.num_tokens, :])
-        position_embeddings = torch.cat(position_embeddings, dim=0)[:, :, None, :]
-
-        embeddings = (token_embeddings + position_embeddings).view(b, t * c, -1)
+        embeddings = token_embeddings.view(b, t * c, -1)
         x = self.drop(embeddings)
         x2 = x.flip(1)
         x, _ = self.blocks((x, mask))
