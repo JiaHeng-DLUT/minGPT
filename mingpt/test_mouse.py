@@ -21,7 +21,7 @@ class TesterConfig:
     input_dim = 12 * 2
     output_dim = 128
     total_frames = 1800
-    clip_frames = 50
+    clip_frames = 100
     num_animals = 3
 
     # data
@@ -35,7 +35,7 @@ class TesterConfig:
     num_workers = 4
 
     # checkpoint setting
-    ckpt_path = f'./experiments/fly/m04_BN_first/epoch21.pth'
+    ckpt_path = f'./experiments/fly/m12_clip_frame/epoch9.pth'
     feat_path = ckpt_path.replace('.pth', '_submission_wo_mask.npy')
     # CUDA_VISIBLE_DEVICES=0 python test_mouse.py
 
