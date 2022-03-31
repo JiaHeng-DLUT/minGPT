@@ -35,7 +35,7 @@ class TesterConfig:
     num_workers = 4
 
     # checkpoint setting
-    ckpt_path = f'./experiments/fly/m04_BN_first/epoch21.pth'
+    ckpt_path = f'./experiments/fly/m13_lr_5e-5/epoch21.pth'
     feat_path = ckpt_path.replace('.pth', '_submission_wo_mask.npy')
     # CUDA_VISIBLE_DEVICES=0 python test_mouse.py
 
