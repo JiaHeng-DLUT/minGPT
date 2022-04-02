@@ -36,9 +36,9 @@ class TesterConfig:
     num_workers = 4
 
     # checkpoint setting
-    ckpt_path = f'./experiments/fly/m16_n_layer_24/epoch24.pth'
+    ckpt_path = f'./experiments/fly/m16_n_layer_24/epoch5.pth'
     feat_path = ckpt_path.replace('.pth', '_submission_wo_mask.npy')
-    # CUDA_VISIBLE_DEVICES=2 python test_mouse.py
+    # CUDA_VISIBLE_DEVICES=1 python test_mouse.py
 
     def __init__(self, **kwargs):
         for k,v in kwargs.items():
@@ -130,7 +130,7 @@ class Tester:
                             batch_size=config.batch_size,
                             num_workers=config.num_workers)
 
-        pbar = tqdm(enumerate(loader), total=len(loader)) if is_train else enumerate(loader)
+        pbar = tqdm(enumerate(loader), total=len(loader))
         feats = []
         frame_number_map = {}
         for it, data in pbar:
