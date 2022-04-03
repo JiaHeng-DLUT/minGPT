@@ -1,0 +1,109 @@
+# general settings
+name: m20_fix_eval_bug_base04
+model_type: AnimalModel
+num_gpu: 1
+manual_seed: 0
+
+# general data information
+data:
+  total_frames: 1800
+  num_frames: 50
+  num_animals: 3
+
+# dataset and data loader settings
+datasets:
+  train:
+    name: mouse_train_0.9
+    type: MouseDataset
+    data_path: ../Mouse_Triplets/Notebooks/data/user_train.npy,
+    meta_path: mingpt/data/meta_info/mouse/mouse_meta_info_train_0.txt,
+    num_frames: ${data.num_frames},
+    total_frames: ${data.total_frames},
+    use_label: False,
+
+    # data loader
+    num_worker_per_gpu: 4
+    batch_size_per_gpu: 32
+
+  val:
+    name: mouse_val_0.1
+    type: MouseDataset
+    data_path: ../Mouse_Triplets/Notebooks/data/user_train.npy,
+    meta_path: mingpt/data/meta_info/mouse/mouse_meta_info_val_0.txt,
+    num_frames: ${data.num_frames},
+    total_frames: ${data.total_frames},
+    use_label: False,
+
+    # data loader
+    num_worker_per_gpu: 4
+    batch_size_per_gpu: 32
+
+# network structures
+network:
+  type: AnimalST
+
+  input_dim: 24
+  n_embd: 48
+  n_layer: 12
+  n_head: 12
+  output_dim: 128
+
+  embd_pdrop: 0.1
+  resid_pdrop: 0.1
+  attn_pdrop: 0.1
+
+  num_frames: ${data.num_frames}
+  num_animals: ${data.num_animals}
+  total_frames: ${data.total_frames}
+
+# path
+path:
+  pretrain_network: ~
+  strict_load: true
+  resume_state: ~
+
+# training settings
+train:
+  optim:
+    type: AdamW
+    lr: !!float 1e-5
+    weight_decay: 0.1
+    betas: [0.9, 0.95]
+
+  scheduler:
+    type: CosineAnnealingRestartLR
+    periods: [50000]
+    restart_weights: [1]
+    eta_min: !!float 1e-7
+
+  total_iter: 50000
+  warmup_iter: 5000  # -1: no warm up
+
+  # losses
+  animal_opt:
+    type: MSELoss
+    loss_weight: 1.0
+    reduction: mean
+
+  frame_opt:
+    type: MSELoss
+    loss_weight: 1.0
+    reduction: mean
+
+# validation settings
+val:
+  val_freq: !!float 2e3
+
+# logging settings
+logger:
+  print_freq: 100
+  save_checkpoint_freq: !!float 2e3
+  use_tb_logger: true
+  wandb:
+    project: mouse
+    resume_id: ~
+
+# dist training settings
+dist_params:
+  backend: nccl
+  port: 29500

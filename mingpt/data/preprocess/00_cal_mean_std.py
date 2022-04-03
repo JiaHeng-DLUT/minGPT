@@ -6,7 +6,7 @@ user_train = np.load(data_path, allow_pickle=True).item()
 seqs = user_train['sequences']
 keypoints = []
 for id in seqs:
-    keypoint = seqs[id]['keypoints']            # (4500, 11, 24, 2)
+    keypoint = seqs[id]['keypoints']            # (b, num_animals, num_keypoints, 2)
     b, c, h, w = keypoint.shape
     keypoint = keypoint.reshape(b * c, h * w)
     keypoints.append(keypoint)

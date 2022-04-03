@@ -4,7 +4,7 @@ import os
 import torch
 from skimage import transform as trans
 
-from basicsr.utils import imwrite
+from mingpt.utils import imwrite
 
 try:
     import dlib
