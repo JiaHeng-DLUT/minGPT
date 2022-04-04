@@ -80,7 +80,8 @@ def create_train_val_dataloader(opt, logger):
             train_loader = create_dataloader(
                 train_set,
                 dataset_opt,
-                seed=opt['manual_seed'])
+                seed=opt['manual_seed'],
+                phase=phase)
 
             num_iter_per_epoch = math.ceil(
                 len(train_set) / (dataset_opt['batch_size_per_gpu'] * opt['world_size']))
@@ -99,7 +100,8 @@ def create_train_val_dataloader(opt, logger):
             val_loader = create_dataloader(
                 val_set,
                 dataset_opt,
-                seed=opt['manual_seed'])
+                seed=opt['manual_seed'],
+                phase=phase)
             logger.info(
                 f'Number of val samples in {dataset_opt["name"]}: '
                 f'{len(val_set)}')
@@ -162,6 +164,7 @@ def main():
     data_time, iter_time = time.time(), time.time()
     start_time = time.time()
 
+    model.validation(val_loader, current_iter, tb_logger)
     for epoch in range(start_epoch, total_epochs + 1):
         for train_data in train_loader:
             data_time = time.time() - data_time

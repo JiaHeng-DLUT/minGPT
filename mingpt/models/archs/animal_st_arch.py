@@ -35,7 +35,6 @@ class CausalSelfAttention(nn.Module):
         mask = (a * b).transpose(1, 2).reshape(num_frames *
                                                num_animals, -1)[None, None, :, :]
         self.register_buffer("mask", mask)
-        print(self.mask.tolist())
         self.n_head = opt['n_head']
 
     def forward(self, x, mask, layer_past=None):
@@ -181,30 +180,45 @@ class AnimalST(nn.Module):
                       position_embeddings).view(b, t * c, -1)
         masks = masks.view(b, -1)
 
+        # LR
         feat_LR = self.encode(embeddings, masks)
-        ret.update({'feat_LR': feat_LR})
         if flip:
-            embeddings_RL = embeddings.flip(1)
-            masks_RL = masks.flip(1)
-            feat_RL = self.encode(embeddings_RL, masks_RL)
-            ret.update({'feat_RL': feat_RL})
+            # RL
+            feat_RL = self.encode(embeddings.flip(1), masks.flip(1))
 
         if decode_animal:
-            animal_LR = self.decoder_animal(feat_LR) * masks
-            animal_LR = animal_LR.view(b, t, c, -1)
+            masks = masks.view(b, t * c, 1)
+            tokens = tokens.view(b, t * c, -1)
+            # LR
+            animal_LR = (self.decoder_animal(feat_LR) * masks).view(b, t, c, -1)
+            gt = (tokens * masks).view(b, t, c, -1)
+            animal_LR = animal_LR[:, :-1] - gt[:, 1:]
             ret.update({'animal_LR': animal_LR})
+            # RL
             if flip:
-                animal_RL = self.decoder_animal(feat_RL) * masks.flip(1)
-                animal_RL = animal_RL.view(b, t, c, -1)
+                animal_RL = (self.decoder_animal(feat_RL) * masks.flip(1)).view(b, t, c, -1)
+                gt = (tokens.flip(1) * masks.flip(1)).view(b, t, c, -1)
+                animal_RL = animal_RL[:, :-1] - gt[:, 1:]
                 ret.update({'animal_RL': animal_RL})
 
+        # LR
+        feat_LR = feat_LR.view(b, t, c, -1).mean(dim=-2)
+        ret.update({'feat_LR': feat_LR})
+        # RL
+        if flip:
+            feat_RL = feat_RL.view(b, t, c, -1).mean(dim=-2)
+            ret.update({'feat_RL': feat_RL})
+
         if decode_frame:
-            frame_LR = self.decoder_frame(
-                feat_LR.view(b, t, c, -1).mean(dim=-2))
+            # LR
+            tokens = tokens.view(b, t, -1)
+            frame_LR = self.decoder_frame(feat_LR)
+            frame_LR = frame_LR[:, :-1] - tokens[:, 1:]
             ret.update({'frame_LR': frame_LR})
             if flip:
-                frame_RL = self.decoder_frame(
-                    feat_RL.view(b, t, c, -1).mean(dim=-2))
+                # RL
+                frame_RL = self.decoder_frame(feat_RL)
+                frame_RL = frame_RL[:, :-1] - tokens.flip(1)[:, 1:]
                 ret.update({'frame_RL': frame_RL})
 
         return ret
@@ -251,7 +265,6 @@ if __name__ == '__main__':
     print(feat_LR.shape, feat_RL.shape)
     print(animal_LR.shape, animal_RL.shape)
     print(frame_LR.shape, frame_RL.shape)
-    # torch.Size([32, 150, 128]) torch.Size([32, 150, 128])
+    # torch.Size([32, 50, 128]) torch.Size([32, 50, 128])
     # torch.Size([32, 50, 3, 24]) torch.Size([32, 50, 3, 24])
     # torch.Size([32, 50, 72]) torch.Size([32, 50, 72])
-

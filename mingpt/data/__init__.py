@@ -52,7 +52,7 @@ def create_dataset(dataset_opt):
     return dataset
 
 
-def create_dataloader(dataset, dataset_opt, seed):
+def create_dataloader(dataset, dataset_opt, seed, phase):
     """Create dataloader.
 
     Args:
@@ -63,7 +63,6 @@ def create_dataloader(dataset, dataset_opt, seed):
             batch_size_per_gpu (int): Training batch size for each GPU.
         seed (int): Seed.
     """
-    phase = dataset_opt['phase']
     rank, _ = get_dist_info()
     batch_size = dataset_opt['batch_size_per_gpu']
     num_workers = dataset_opt['num_worker_per_gpu']

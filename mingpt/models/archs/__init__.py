@@ -37,7 +37,7 @@ def dynamic_instantiation(modules, cls_type, opt):
             break
     if cls_ is None:
         raise ValueError(f'{cls_type} is not found.')
-    return cls_(**opt)
+    return cls_(opt)
 
 
 def define_network(opt):

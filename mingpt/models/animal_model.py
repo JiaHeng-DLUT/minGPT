@@ -8,6 +8,7 @@ from tqdm import tqdm
 from mingpt.models.archs import define_network
 from mingpt.models.base_model import BaseModel
 from mingpt.utils import get_root_logger
+from mingpt.eval import Evaluator
 
 loss_module = importlib.import_module('mingpt.models.losses')
 
@@ -76,7 +77,7 @@ class AnimalModel(BaseModel):
         whitelist_weight_modules = (torch.nn.Linear, )
         blacklist_weight_modules = (
             torch.nn.LayerNorm, torch.nn.Embedding, torch.nn.BatchNorm2d)
-        for mn, m in self.named_modules():
+        for mn, m in self.net.named_modules():
             for pn, p in m.named_parameters():
                 fpn = '%s.%s' % (mn, pn) if mn else pn  # full param name
 
@@ -94,7 +95,7 @@ class AnimalModel(BaseModel):
         no_decay.add('pos_emb')
 
         # validate that we considered every parameter
-        param_dict = {pn: p for pn, p in self.named_parameters()}
+        param_dict = {pn: p for pn, p in self.net.named_parameters()}
         inter_params = decay & no_decay
         union_params = decay | no_decay
         assert len(
@@ -102,22 +103,23 @@ class AnimalModel(BaseModel):
         assert len(param_dict.keys() - union_params) == 0, "parameters %s were not separated into either decay/no_decay set!" % (
             str(param_dict.keys() - union_params))
 
+        train_opt = self.opt['train']
+
         # create the pytorch optimizer object
         optim_groups = [
             {"params": [param_dict[pn] for pn in sorted(
-                list(decay))], "weight_decay": train_config.weight_decay},
+                list(decay))], "weight_decay": train_opt['optim']['weight_decay']},
             {"params": [param_dict[pn]
                         for pn in sorted(list(no_decay))], "weight_decay": 0.0},
         ]
 
-        train_opt = self.opt['train']
-        optim_type = train_opt['optim_g'].pop('type')
+        optim_type = train_opt['optim'].pop('type')
         if optim_type == 'Adam':
             self.optimizer = torch.optim.Adam(
-                optim_groups ** train_opt['optim'])
+                optim_groups, **train_opt['optim'])
         if optim_type == 'AdamW':
             self.optimizer = torch.optim.AdamW(
-                optim_params, **train_opt['optim'])
+                optim_groups, **train_opt['optim'])
         else:
             raise NotImplementedError(
                 f'optimizer {optim_type} is not supperted yet.')
@@ -143,23 +145,23 @@ class AnimalModel(BaseModel):
         # animal reconstrction loss
         if self.cri_animal:
             l_animal_LR = self.cri_animal(
-                self.output['animal_LR'][:, :-1], self.tokens[:, 1:])
+                self.output['animal_LR'], torch.zeros_like(self.output['animal_LR']))
             l_total += l_animal_LR
             loss_dict['l_animal_LR'] = l_animal_LR
             if flip:
-                self.tokens_RL = self.tokens.flip(1).flip(2)
                 l_animal_RL = self.cri_animal(
-                    self.output['animal_RL'][:, :-1], self.tokens_RL[:, 1:])
+                    self.output['animal_RL'], torch.zeros_like(self.output['animal_RL']))
                 l_total += l_animal_RL
                 loss_dict['l_animal_RL'] = l_animal_RL
 
         if self.cri_frame:
-            l_frame_LR = self.cri_frame(self.output['frame_LR'][:, :-1], self.tokens.flatten(2)[:, 1:])
+            l_frame_LR = self.cri_frame(
+                self.output['frame_LR'], torch.zeros_like(self.output['frame_LR']))
             l_total += l_frame_LR
             loss_dict['l_frame_LR'] = l_frame_LR
             if flip:
                 l_frame_RL = self.cri_frame(
-                    self.output['frame_RL'][:, :-1], self.tokens_RL.flatten(2)[:, 1:])
+                    self.output['frame_RL'], torch.zeros_like(self.output['frame_RL']))
                 l_total += l_frame_RL
                 loss_dict['l_frame_RL'] = l_frame_RL
 
@@ -194,19 +196,19 @@ class AnimalModel(BaseModel):
             # del self.output
             # torch.cuda.empty_cache()
 
-            feat = self.output['feat']
+            feat = self.output['feat_LR']
             feat = feat.view(-1, feat.shape[-1])
             feats.append(feat)
-            label = self.labels.transpose(-1, -2)
+            label = self.labels
             label = label.reshape(-1, label.shape[-1])
             labels.append(label)
 
         feats = torch.cat(feats, dim=0)
         labels = torch.cat(labels, dim=0)
-        assert(feats.shape[0] == labels.shape[0])
+        assert feats.shape[0] == labels.shape[0]
         metric = self.evaluator.eval(feats, labels)
         if tb_logger:
-            tb_logger.add_scalar('metric', value, current_iter)
+            tb_logger.add_scalar('metric', metric, current_iter)
 
     def save(self, epoch, current_iter):
         self.save_network(self.net, 'net', current_iter)
