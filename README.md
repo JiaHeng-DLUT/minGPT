@@ -1,3 +1,11 @@
+Test:
+
+```
+export PYTHONPATH=$PYTHONPATH:.
+CUDA_VISIBLE_DEVICES=2 python mingpt/test.py -opt options/test/mouse/test_m20_fix_eval_bug_base04.yml
+```
+
+
 
 # minGPT
 
