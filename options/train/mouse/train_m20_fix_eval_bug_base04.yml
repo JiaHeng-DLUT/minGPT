@@ -131,7 +131,6 @@ val:
         !!float 1e6,
         !!float 1e7,
       ]
-    pos_weight: [3309, 1.54]
     input_dim: *output_dim
     output_dim: 1
 

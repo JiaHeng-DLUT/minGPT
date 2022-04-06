@@ -22,6 +22,7 @@ class AnimalModel(BaseModel):
         super(AnimalModel, self).__init__(opt)
 
         self.evaluator = Evaluator(opt['val']['val_opt'])
+        self.metrics = []
 
         # define network
         self.net = define_network(deepcopy(opt['network']))
@@ -37,7 +38,6 @@ class AnimalModel(BaseModel):
         if self.is_train:
             self.init_training_settings()
         
-        self.metrics = []
 
     def init_training_settings(self):
         self.net.train()

@@ -1,4 +1,5 @@
 import copy
+import numpy as np
 import random
 import torch
 import torch.nn as nn
@@ -36,7 +37,7 @@ def create_dataloader(feat, label, index):
     return data
 
 
-def train(seed, subtask, data, model, optimizer, pos_weight):
+def train(seed, subtask, data, model, optimizer):
     logger = get_root_logger()
     train_data = data['train']
     val_data = data['val']
@@ -49,9 +50,9 @@ def train(seed, subtask, data, model, optimizer, pos_weight):
         feat = train_data['feat']
         label = train_data['label'][:, subtask]
         logit = model(feat).squeeze(-1)
-        weight = (label.shape[0] - label.sum()) / label.sum()
+        pos_weight = (label.shape[0] - label.sum()) / label.sum()
         loss = F.binary_cross_entropy_with_logits(
-            logit, label, pos_weight=weight)
+            logit, label, pos_weight=pos_weight)
         model.zero_grad()
         loss.backward()
         optimizer.step()
@@ -118,8 +119,12 @@ class Evaluator:
                 index = list(range(num))
                 random.shuffle(index)
                 self.index_list.append(index)
+        print([index[:3] for index in self.index_list])
+        np.savetxt('mouse_meta_info_val_0_index.txt', np.array(self.index_list).astype(int), fmt='%s')
+        index_list = np.loadtxt('mouse_meta_info_val_0_index.txt').astype(int)
+        print([index[:3] for index in index_list])
+        assert 0
         logger.info(f'Start evaluation')
-        logger.info(f'Index: {[index[:5] for index in self.index_list]}')
         result = torch.zeros((self.num_seeds, self.num_subtasks))
         # 1. loop seeds
         for seed, index in enumerate(self.index_list):
@@ -146,11 +151,8 @@ class Evaluator:
                     # create optimizer
                     optimizer = optim.SGD(
                         self.model.parameters(), lr, momentum=0.9)
-                    # create pos_weight
-                    pos_weight = torch.Tensor(
-                        [self.opt['pos_weight'][subtask]]).to(0)
                     (metric, state_dict) = train(
-                        seed, subtask, data, self.model, optimizer, pos_weight)
+                        seed, subtask, data, self.model, optimizer)
                     if metric > best_metric:
                         best_metric = metric
                         best_state_dict = state_dict
