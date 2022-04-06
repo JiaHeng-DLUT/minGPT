@@ -21,6 +21,8 @@ class AnimalModel(BaseModel):
     def __init__(self, opt):
         super(AnimalModel, self).__init__(opt)
 
+        self.evaluator = Evaluator(opt['val']['val_opt'])
+
         # define network
         self.net = define_network(deepcopy(opt['network']))
         self.net = self.model_to_device(self.net)
@@ -34,7 +36,8 @@ class AnimalModel(BaseModel):
 
         if self.is_train:
             self.init_training_settings()
-            self.evaluator = Evaluator(opt['val']['val_opt'])
+        
+        self.metrics = []
 
     def init_training_settings(self):
         self.net.train()
@@ -207,8 +210,18 @@ class AnimalModel(BaseModel):
         labels = torch.cat(labels, dim=0)
         assert feats.shape[0] == labels.shape[0]
         metric = self.evaluator.eval(feats, labels)
-        if tb_logger:
-            tb_logger.add_scalar('metric', metric, current_iter)
+
+        self.metrics.append(metric)
+        metrics = torch.stack(self.metrics, dim=0)
+        # https://www.cnblogs.com/wanghui-garcia/p/12982732.html
+        rank = metrics.sort(dim=0, descending=True)[1].sort(dim=0)[1]
+        rank_mean = rank.float().mean(dim=1)
+        logger = get_root_logger()
+        logger.info(f'{metrics}')
+        logger.info(f'{rank}')
+        logger.info(f'{rank_mean}')
+        # if tb_logger:
+        #     tb_logger.add_scalar('metric', metric, current_iter)
 
     def save(self, epoch, current_iter):
         self.save_network(self.net, 'net', current_iter)
