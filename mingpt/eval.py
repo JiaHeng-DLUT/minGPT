@@ -105,7 +105,7 @@ class Evaluator:
         self.num_seeds = opt['num_seeds']
         self.num_subtasks = opt['num_subtasks']
         self.lr_list = opt['lr_list']
-        self.index_list = []
+        self.index_list = np.loadtxt(opt['meta_path']).astype(int).tolist()
         self.model = Head(opt).to(0)
         self.init_state_dict = copy.deepcopy(self.model.state_dict())
 
@@ -114,16 +114,6 @@ class Evaluator:
         """
         logger = get_root_logger()
         num = feat.shape[0]
-        if len(self.index_list) == 0:
-            for i in range(self.num_seeds):
-                index = list(range(num))
-                random.shuffle(index)
-                self.index_list.append(index)
-        print([index[:3] for index in self.index_list])
-        np.savetxt('mouse_meta_info_val_0_index.txt', np.array(self.index_list).astype(int), fmt='%s')
-        index_list = np.loadtxt('mouse_meta_info_val_0_index.txt').astype(int)
-        print([index[:3] for index in index_list])
-        assert 0
         logger.info(f'Start evaluation')
         result = torch.zeros((self.num_seeds, self.num_subtasks))
         # 1. loop seeds
