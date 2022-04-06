@@ -130,7 +130,7 @@ class AnimalModel(BaseModel):
         self.mask = data['mask'].to(self.device).long()
         self.pos = data['pos']
         if 'labels' in data:
-            self.labels = data['labels'].to(self.device).long()
+            self.labels = data['labels'].to(self.device)
 
     def optimize_parameters(self, current_iter):
         self.optimizer.zero_grad()

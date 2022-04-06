@@ -1,5 +1,5 @@
 # general settings
-name: m20_fix_eval_bug_base04
+name: m20_fix_eval_bug_base04_debug_2
 model_type: AnimalModel
 num_gpu: 1
 manual_seed: 0
@@ -37,7 +37,7 @@ datasets:
     name: mouse_val_0.1
     type: MouseDataset
     data_path: ../Mouse_Triplets/Notebooks/data/user_train.npy
-    meta_path: mingpt/data/meta_info/mouse/mouse_meta_info_val_0.txt
+    meta_path: mingpt/data/meta_info/mouse/mouse_meta_info_train.txt
     num_frames: *num_frames
     total_frames: *total_frames
     use_label: true
@@ -113,7 +113,6 @@ val:
   val_opt:
     num_seeds: 3
     num_subtasks: 2
-    num_process: 1
     lr_list:
       [
         !!float 1e-6,
@@ -126,9 +125,10 @@ val:
         !!float 1e1,
         !!float 1e2,
       ]
+    pos_weight: [1633, 1.37]
     batch_size: 1
     input_dim: *output_dim
-    output_dim: 2
+    output_dim: 1
 
 # logging settings
 logger:

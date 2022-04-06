@@ -172,25 +172,27 @@ def main():
             current_iter += 1
             if current_iter > total_iters:
                 break
-            # update learning rate
-            model.update_learning_rate(
-                current_iter, warmup_iter=opt['train'].get('warmup_iter', -1))
-            # training
-            model.feed_data(train_data)
-            model.optimize_parameters(current_iter)
-            iter_time = time.time() - iter_time
-            # log
-            if current_iter % opt['logger']['print_freq'] == 0:
-                log_vars = {'epoch': epoch, 'iter': current_iter}
-                log_vars.update({'lrs': model.get_current_learning_rate()})
-                log_vars.update({'time': iter_time, 'data_time': data_time})
-                log_vars.update(model.get_current_log())
-                msg_logger(log_vars)
+            # # update learning rate
+            # model.update_learning_rate(
+            #     current_iter, warmup_iter=opt['train'].get('warmup_iter', -1))
+            # # training
+            # model.feed_data(train_data)
+            # model.optimize_parameters(current_iter)
+            # iter_time = time.time() - iter_time
+            # # log
+            # if current_iter % opt['logger']['print_freq'] == 0:
+            #     log_vars = {'epoch': epoch, 'iter': current_iter}
+            #     log_vars.update({'lrs': model.get_current_learning_rate()})
+            #     log_vars.update({'time': iter_time, 'data_time': data_time})
+            #     log_vars.update(model.get_current_log())
+            #     msg_logger(log_vars)
 
-            # save models and training states
+            # # save models and training states
+            # if current_iter % opt['logger']['save_checkpoint_freq'] == 0:
+            #     logger.info('Saving models and training states.')
+            #     model.save(epoch, current_iter)
             if current_iter % opt['logger']['save_checkpoint_freq'] == 0:
-                logger.info('Saving models and training states.')
-                model.save(epoch, current_iter)
+                model.load_network(model.net, f'experiments/m20_fix_eval_bug_base04/models/net_{current_iter}.pth')
 
             # validation
             if opt.get('val') is not None and (current_iter %

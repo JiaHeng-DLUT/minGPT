@@ -55,6 +55,7 @@ def create_dataloader(feats, labels, indexes, opt):
 
 
 def train(subtask, feats, labels, train_indexes, val_indexes, init_state_dict, lr, opt):
+    logger = get_root_logger()
     # create dataloader
     train_dataloader = create_dataloader(feats, labels, train_indexes, opt)
     val_dataloader = create_dataloader(feats, labels, val_indexes, opt)
@@ -71,8 +72,10 @@ def train(subtask, feats, labels, train_indexes, val_indexes, init_state_dict, l
         for data in train_dataloader:
             feat = data['feat'].squeeze(0)
             label = data['label'].squeeze(0)[:, subtask]
-            logit = model(feat)
-            loss = F.cross_entropy(logit, label)
+            logit = model(feat).squeeze(-1)
+            pos_weight = torch.Tensor([opt['pos_weight'][subtask]]).to(label)
+            loss = F.binary_cross_entropy_with_logits(
+                logit, label, pos_weight=pos_weight)
             model.zero_grad()
             loss.backward()
             optimizer.step()
@@ -83,15 +86,15 @@ def train(subtask, feats, labels, train_indexes, val_indexes, init_state_dict, l
             for data in val_dataloader:
                 feat = data['feat'].squeeze(0)
                 label = data['label'].squeeze(0)[:, subtask]
-                logit = model(feat)
+                logit = model(feat).squeeze(-1)
                 logits.append(logit)
                 labels.append(label)
             logits = torch.cat(logits, dim=0).cpu()
             labels = torch.cat(labels, dim=0).cpu()
-            (acc, P, R, f1) = cal_metric(logits, labels)
-            # logger.info(f'epoch: {e + 1}, acc: {acc:.5f}, P: {P:.5f}, R: {R:.5f}, f1: {f1:.5f}')
-            if f1 > best_metric:
-                best_metric = f1
+            (acc, P, R, f1, mP) = cal_metric(logits, labels)
+            logger.info(f'epoch: {e + 1}, acc: {acc:.5f}, P: {P:.5f}, R: {R:.5f}, f1: {f1:.5f}, mP: {mP:.5f}')
+            if mP > best_metric:
+                best_metric = mP
                 best_state_dict = copy.deepcopy(model.module.state_dict())
     return (best_metric, best_state_dict)
 
@@ -111,7 +114,7 @@ def test(subtask, feats, labels, test_indexes, state_dict, opt):
     for data in dataloader:
         feat = data['feat'].squeeze(0)
         label = data['label'].squeeze(0)[:, subtask]
-        logit = model(feat)
+        logit = model(feat).squeeze(-1)
         logits.append(logit)
         labels.append(label)
     logits = torch.cat(logits, dim=0).cpu()
@@ -120,8 +123,8 @@ def test(subtask, feats, labels, test_indexes, state_dict, opt):
 
 
 def cal_metric(logits, labels):
-    preds = torch.argmax(logits, dim=1)
-    TP, FN, FP, TN = 0, 0, 0, 0
+    preds = (logits > 0)
+    TP = FN = FP = TN = P0 = 0
     TP = ((labels == 1) & (preds == 1)).sum().item()
     FN = ((labels == 1) & (preds == 0)).sum().item()
     FP = ((labels == 0) & (preds == 1)).sum().item()
@@ -129,13 +132,17 @@ def cal_metric(logits, labels):
     acc, P, R, f1 = 0, 0, 0, 0
     if (TP + FN + FP + TN) != 0:
         acc = TP / (TP + FN + FP + TN)
+
     if (TP + FP) != 0:
         P = TP / (TP + FP)
     if (TP + TN) != 0:
         R = TP / (TP + TN)
     if (P + R) != 0:
         f1 = 2 * P * R / (P + R)
-    return (acc, P, R, f1)
+    if (TN + FN) != 0:
+        P0 = TN / (TN + FN)
+    mP = (P + P0) / 2.
+    return (acc, P, R, f1, mP)
 
 
 class Evaluator:
@@ -185,11 +192,11 @@ class Evaluator:
                     logger.info(
                         f'lr: {lr:e}, metric: {metric:.5f}, best_metric: {best_metric:.5f}')
                 # 6. test
-                (acc, P, R, f1) = cal_metric(
+                (acc, P, R, f1, mP) = cal_metric(
                     *test(j, feats, labels, test_indexes, best_state_dict, self.opt))
-                result[i, j] = f1
+                result[i, j] = mP
                 logger.info(
-                    f'Seed {i}, Subtask {j}, ACC: {acc:.5f}, P: {P:.5f}, R: {R:.5f}, F1: {f1:.5f}')
+                    f'Seed {i}, Subtask {j}, ACC: {acc:.5f}, P: {P:.5f}, R: {R:.5f}, F1: {f1:.5f}, mP: {mP:.5f}')
         logger.info(result)
         logger.info(f'ave: {result.mean().item()}')
         logger.info(f'End evaluation')

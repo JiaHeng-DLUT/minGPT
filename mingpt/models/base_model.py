@@ -254,15 +254,15 @@ class BaseModel():
                 load_net[k[7:]] = v
                 load_net.pop(k)
         self._print_different_keys_loading(net, load_net, strict)
-        for k in load_net:
-            if k.endswith('mask'):
-                print(k, load_net[k].shape)
-        for k in load_net:
-            if k.endswith('mask'):
-                load_net[k] = torch.ones_like(load_net[k])
-        for k in load_net:
-            if k.endswith('mask'):
-                print(k, load_net[k].shape)
+        # for k in load_net:
+        #     if k.endswith('mask'):
+        #         print(k, load_net[k].shape)
+        # for k in load_net:
+        #     if k.endswith('mask'):
+        #         load_net[k] = torch.ones_like(load_net[k])
+        # for k in load_net:
+        #     if k.endswith('mask'):
+        #         print(k, load_net[k].shape)
         net.load_state_dict(load_net, strict=strict)
 
     @master_only
