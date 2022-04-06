@@ -71,11 +71,10 @@ def train(subtask, feats, labels, train_indexes, val_indexes, init_state_dict, l
         model.train()
         for data in train_dataloader:
             feat = data['feat'].squeeze(0)
-            label = data['label'].squeeze(0)[:, subtask]
-            logit = model(feat).squeeze(-1)
-            pos_weight = torch.Tensor([opt['pos_weight'][subtask]]).to(label)
-            loss = F.binary_cross_entropy_with_logits(
-                logit, label, pos_weight=pos_weight)
+            label = data['label'].squeeze(0)[:, subtask].long()
+            logit = model(feat)
+            weight = torch.Tensor([1, opt['pos_weight'][subtask]]).to(feat)
+            loss = F.cross_entropy(logit, label, weight=weight)
             model.zero_grad()
             loss.backward()
             optimizer.step()
@@ -86,7 +85,7 @@ def train(subtask, feats, labels, train_indexes, val_indexes, init_state_dict, l
             for data in val_dataloader:
                 feat = data['feat'].squeeze(0)
                 label = data['label'].squeeze(0)[:, subtask]
-                logit = model(feat).squeeze(-1)
+                logit = model(feat)
                 logits.append(logit)
                 labels.append(label)
             logits = torch.cat(logits, dim=0).cpu()
@@ -114,7 +113,7 @@ def test(subtask, feats, labels, test_indexes, state_dict, opt):
     for data in dataloader:
         feat = data['feat'].squeeze(0)
         label = data['label'].squeeze(0)[:, subtask]
-        logit = model(feat).squeeze(-1)
+        logit = model(feat)
         logits.append(logit)
         labels.append(label)
     logits = torch.cat(logits, dim=0).cpu()
@@ -123,7 +122,7 @@ def test(subtask, feats, labels, test_indexes, state_dict, opt):
 
 
 def cal_metric(logits, labels):
-    preds = (logits > 0)
+    preds = torch.argmax(logits, dim=1)
     TP = FN = FP = TN = P0 = 0
     TP = ((labels == 1) & (preds == 1)).sum().item()
     FN = ((labels == 1) & (preds == 0)).sum().item()
