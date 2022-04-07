@@ -230,4 +230,4 @@ class AnimalModel(BaseModel):
 
     def save(self, epoch, current_iter):
         self.save_network(self.net, 'net', current_iter)
-        self.save_training_state(epoch, current_iter)
+        # self.save_training_state(epoch, current_iter)
