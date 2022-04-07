@@ -96,8 +96,8 @@ class AnimalModel(BaseModel):
                     # weights of blacklist modules will NOT be weight decayed
                     no_decay.add(fpn)
 
-        # # special case the position embedding parameter in the root GPT module as not decayed
-        # no_decay.add('pos_emb')
+        # special case the position embedding parameter in the root GPT module as not decayed
+        no_decay.add('pos_emb')
 
         # validate that we considered every parameter
         param_dict = {pn: p for pn, p in self.net.named_parameters()}
