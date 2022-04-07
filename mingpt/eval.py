@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from torch.cuda.amp import autocast as autocast, GradScaler
 from torch.utils.data import Dataset, DataLoader
 from mingpt.utils import get_time_str, get_root_logger
 
@@ -45,17 +46,23 @@ def train(seed, subtask, data, model, optimizer):
 
     best_metric = 0
     best_state_dict = copy.deepcopy(model.state_dict())
+
+    scaler = GradScaler()
+    
     for e in range(20):
         model.train()
         feat = train_data['feat']
         label = train_data['label'][:, subtask]
-        logit = model(feat).squeeze(-1)
-        pos_weight = (label.shape[0] - label.sum()) / label.sum()
-        loss = F.binary_cross_entropy_with_logits(
-            logit, label, pos_weight=pos_weight)
+
+        with autocast():
+            logit = model(feat).squeeze(-1)
+            pos_weight = (label.shape[0] - label.sum()) / label.sum()
+            loss = F.binary_cross_entropy_with_logits(logit, label, pos_weight=pos_weight)
         model.zero_grad()
-        loss.backward()
-        optimizer.step()
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
+
         (acc, P, R, f1, mP) = val_test(subtask, val_data, model)
         # logger.info(
         #     f'Epoch: {e + 1}, ACC: {acc:.5f}, P: {P:.5f}, R: {R:.5f}, F1: {f1:.5f}, mP: {mP:.5f}')
@@ -72,7 +79,8 @@ def val_test(subtask, data, model):
     model.eval()
     feat = data['feat']
     label = data['label'][:, subtask]
-    logit = model(feat).squeeze(-1)
+    with autocast():
+        logit = model(feat).squeeze(-1)
     metrics = cal_metrics(logit, label)
     return metrics
 

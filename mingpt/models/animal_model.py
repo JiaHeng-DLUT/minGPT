@@ -3,6 +3,7 @@ import torch
 from collections import OrderedDict
 from copy import deepcopy
 from os import path as osp
+from torch.cuda.amp import autocast as autocast, GradScaler
 from tqdm import tqdm
 
 from mingpt.models.archs import define_network
@@ -37,7 +38,8 @@ class AnimalModel(BaseModel):
 
         if self.is_train:
             self.init_training_settings()
-        
+
+        self.scaler = GradScaler()
 
     def init_training_settings(self):
         self.net.train()
@@ -140,38 +142,41 @@ class AnimalModel(BaseModel):
         decode_animal = (self.cri_animal is not None)
         decode_frame = (self.cri_frame is not None)
         flip = self.opt['train']['flip']
-        self.output = self.net(self.tokens, self.mask, self.pos,
-                               flip=flip, decode_animal=decode_animal, decode_frame=decode_frame)
+        with autocast():
+            self.output = self.net(self.tokens, self.mask, self.pos, flip=flip,
+                                   decode_animal=decode_animal, decode_frame=decode_frame)
 
-        l_total = 0
-        loss_dict = OrderedDict()
-        # animal reconstrction loss
-        if self.cri_animal:
-            l_animal_LR = self.cri_animal(
-                self.output['animal_LR'], torch.zeros_like(self.output['animal_LR']))
-            l_total += l_animal_LR
-            loss_dict['l_animal_LR'] = l_animal_LR
-            if flip:
-                l_animal_RL = self.cri_animal(
-                    self.output['animal_RL'], torch.zeros_like(self.output['animal_RL']))
-                l_total += l_animal_RL
-                loss_dict['l_animal_RL'] = l_animal_RL
+            l_total = 0
+            loss_dict = OrderedDict()
+            # animal reconstrction loss
+            if self.cri_animal:
+                l_animal_LR = self.cri_animal(
+                    self.output['animal_LR'], torch.zeros_like(self.output['animal_LR']))
+                l_total += l_animal_LR
+                loss_dict['l_animal_LR'] = l_animal_LR
+                if flip:
+                    l_animal_RL = self.cri_animal(
+                        self.output['animal_RL'], torch.zeros_like(self.output['animal_RL']))
+                    l_total += l_animal_RL
+                    loss_dict['l_animal_RL'] = l_animal_RL
 
-        if self.cri_frame:
-            l_frame_LR = self.cri_frame(
-                self.output['frame_LR'], torch.zeros_like(self.output['frame_LR']))
-            l_total += l_frame_LR
-            loss_dict['l_frame_LR'] = l_frame_LR
-            if flip:
-                l_frame_RL = self.cri_frame(
-                    self.output['frame_RL'], torch.zeros_like(self.output['frame_RL']))
-                l_total += l_frame_RL
-                loss_dict['l_frame_RL'] = l_frame_RL
+            if self.cri_frame:
+                l_frame_LR = self.cri_frame(
+                    self.output['frame_LR'], torch.zeros_like(self.output['frame_LR']))
+                l_total += l_frame_LR
+                loss_dict['l_frame_LR'] = l_frame_LR
+                if flip:
+                    l_frame_RL = self.cri_frame(
+                        self.output['frame_RL'], torch.zeros_like(self.output['frame_RL']))
+                    l_total += l_frame_RL
+                    loss_dict['l_frame_RL'] = l_frame_RL
 
-        l_total.backward()
+        self.scaler.scale(l_total).backward()
+        self.scaler.unscale_(self.optimizer)
         torch.nn.utils.clip_grad_norm_(
             self.net.parameters(), self.opt['train']['grad_norm_clip'])
-        self.optimizer.step()
+        self.scaler.step(self.optimizer)
+        self.scaler.update()
 
         self.log_dict = self.reduce_loss_dict(loss_dict)
 
