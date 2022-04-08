@@ -1,5 +1,5 @@
 '''
-Spatial-temporal positional embedding
+Wo positional embedding
 Embedding layer: MLM head (GELU)
 '''
 import math
@@ -111,8 +111,6 @@ class AnimalSTEmbMLM(nn.Module):
             nn.Linear(opt['input_dim'], opt['n_embd'])
         )
         self.bn = nn.BatchNorm2d(opt['input_dim'])
-        self.pos_emb = nn.Parameter(torch.zeros(
-            1, opt['total_frames'], opt['num_animals'], opt['n_embd']))
         self.drop = nn.Dropout(opt['embd_pdrop'])
         # transformer
         self.blocks = nn.Sequential(*[Block(opt)
@@ -176,16 +174,10 @@ class AnimalSTEmbMLM(nn.Module):
         ret = {}
 
         b, t, c, d = tokens.shape
-        assert t <= self.total_frames, "Cannot forward, pos_emb is exhausted."
 
         token_embeddings = self.tok_emb(
             self.bn(tokens.permute(0, 3, 1, 2)).permute(0, 2, 3, 1))
-        position_embeddings = []
-        for i in range(b):
-            position_embeddings.append(self.pos_emb[:, pos[i]: pos[i] + t])
-        position_embeddings = torch.cat(position_embeddings, dim=0)
-        embeddings = (token_embeddings +
-                      position_embeddings).view(b, t * c, -1)
+        embeddings = token_embeddings.view(b, t * c, -1)
         masks = masks.view(b, -1)
 
         # LR
