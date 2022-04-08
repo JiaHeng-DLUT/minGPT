@@ -52,8 +52,8 @@ network:
   # Transformer
   input_dim: 24
   n_embd: 132
-  n_layer: 12
-  n_head: 6
+  n_layer: 6
+  n_head: 12
   output_dim: *output_dim
   # dropout
   embd_pdrop: 0.1
