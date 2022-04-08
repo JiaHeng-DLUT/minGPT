@@ -1,0 +1,83 @@
+# general settings
+name: test_m31_emb_layer_mlm_head_tanh
+model_type: AnimalModel
+num_gpu: 1
+manual_seed: 0
+
+# common settings
+common:
+  total_frames: &total_frames 1800
+  num_frames: &num_frames 50
+  num_animals: &num_animals 3
+  output_dim: &output_dim 128
+
+# dataset and data loader settings
+datasets:
+  test:
+    name: mouse_test
+    type: MouseDataset
+    data_path: ../Mouse_Triplets/Notebooks/data/submission_data.npy
+    meta_path: mingpt/data/meta_info/mouse/mouse_meta_info_test.txt
+    frame_number_map_path: ../Mouse_Triplets/Notebooks/data/frame_number_map.npy
+    num_frames: *num_frames
+    total_frames: *total_frames
+    use_label: false
+
+    # data loader
+    num_worker_per_gpu: 4
+    batch_size_per_gpu: 32
+
+# network structures
+network:
+  type: AnimalSTEmbMLMTanh
+  # Transformer
+  input_dim: 24
+  n_embd: 768
+  n_layer: 12
+  n_head: 12
+  output_dim: *output_dim
+  # dropout
+  embd_pdrop: 0.1
+  resid_pdrop: 0.1
+  attn_pdrop: 0.1
+  # attention mask
+  num_frames: *num_frames
+  num_animals: *num_animals
+  # pos emb
+  total_frames: *total_frames
+  # decoder
+  decode_animal: true
+  decode_frame: true
+
+# path
+path:
+  pretrain_network: ./experiments/train_m31_emb_layer_mlm_head_tanh/models/net_18000.pth
+  # pretrain_network: ./experiments/train_m31_emb_layer_mlm_head_tanh/models/net_34000.pth
+  strict_load: true
+
+# validation settings
+val:
+  val_opt:
+    num_seeds: 6
+    num_subtasks: 2
+    lr_list:
+      [
+        !!float 1e-7,
+        !!float 1e-6,
+        !!float 1e-5,
+        !!float 1e-4,
+        !!float 1e-3,
+        !!float 1e-2,
+        !!float 1e-1,
+        !!float 1e0,
+        !!float 1e1,
+        !!float 1e2,
+        !!float 1e3,
+        !!float 1e4,
+        !!float 1e5,
+        !!float 1e6,
+        !!float 1e7,
+      ]
+    input_dim: *output_dim
+    output_dim: 1
+    meta_path: mingpt/data/meta_info/mouse/mouse_meta_info_val_0_index.txt
