@@ -186,13 +186,13 @@ class AnimalSTMaskModeling(nn.Module):
             # LR
             animal_LR = (self.decoder_animal(feat_LR) * masks).view(b, t, c, -1)
             gt = (tokens * masks).view(b, t, c, -1)
-            animal_LR = animal_LR[:, :-1] - gt[:, 1:]
+            animal_LR = animal_LR - gt
             ret.update({'animal_LR': animal_LR})
             # RL
             if flip:
                 animal_RL = (self.decoder_animal(feat_RL) * masks.flip(1)).view(b, t, c, -1)
                 gt = (tokens.flip(1) * masks.flip(1)).view(b, t, c, -1)
-                animal_RL = animal_RL[:, :-1] - gt[:, 1:]
+                animal_RL = animal_RL - gt
                 ret.update({'animal_RL': animal_RL})
 
         # LR
@@ -207,12 +207,12 @@ class AnimalSTMaskModeling(nn.Module):
             # LR
             tokens = tokens.view(b, t, -1)
             frame_LR = self.decoder_frame(feat_LR)
-            frame_LR = frame_LR[:, :-1] - tokens[:, 1:]
+            frame_LR = frame_LR - tokens
             ret.update({'frame_LR': frame_LR})
             if flip:
                 # RL
                 frame_RL = self.decoder_frame(feat_RL)
-                frame_RL = frame_RL[:, :-1] - tokens.flip(1)[:, 1:]
+                frame_RL = frame_RL - tokens.flip(1)
                 ret.update({'frame_RL': frame_RL})
 
         return ret
