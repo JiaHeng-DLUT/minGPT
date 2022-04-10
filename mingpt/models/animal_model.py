@@ -173,8 +173,6 @@ class AnimalModel(BaseModel):
 
         self.scaler.scale(l_total).backward()
         self.scaler.unscale_(self.optimizer)
-        torch.nn.utils.clip_grad_norm_(
-            self.net.parameters(), self.opt['train']['grad_norm_clip'])
         self.scaler.step(self.optimizer)
         self.scaler.update()
 
