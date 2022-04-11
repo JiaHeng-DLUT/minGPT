@@ -192,11 +192,9 @@ class AnimalModel(BaseModel):
             # torch.cuda.empty_cache()
 
             feat = self.output
-            print(1, feat.shape)
             feat = feat.view(-1, feat.shape[-1])
             feats.append(feat)
             label = self.labels
-            print(2, label.shape)
             label = label.reshape(-1, label.shape[-1])
             labels.append(label)
 
