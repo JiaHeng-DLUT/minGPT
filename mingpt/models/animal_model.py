@@ -143,33 +143,20 @@ class AnimalModel(BaseModel):
         decode_frame = (self.cri_frame is not None)
         flip = self.opt['train']['flip']
         with autocast():
-            self.output = self.net(self.tokens, self.mask, self.pos, flip=flip,
-                                   decode_animal=decode_animal, decode_frame=decode_frame)
-
             l_total = 0
             loss_dict = OrderedDict()
-            # animal reconstrction loss
-            if self.cri_animal:
-                l_animal_LR = self.cri_animal(
-                    self.output['animal_LR'], torch.zeros_like(self.output['animal_LR']))
-                l_total += l_animal_LR
-                loss_dict['l_animal_LR'] = l_animal_LR
-                if flip:
-                    l_animal_RL = self.cri_animal(
-                        self.output['animal_RL'], torch.zeros_like(self.output['animal_RL']))
-                    l_total += l_animal_RL
-                    loss_dict['l_animal_RL'] = l_animal_RL
 
-            if self.cri_frame:
-                l_frame_LR = self.cri_frame(
-                    self.output['frame_LR'], torch.zeros_like(self.output['frame_LR']))
-                l_total += l_frame_LR
-                loss_dict['l_frame_LR'] = l_frame_LR
-                if flip:
-                    l_frame_RL = self.cri_frame(
-                        self.output['frame_RL'], torch.zeros_like(self.output['frame_RL']))
-                    l_total += l_frame_RL
-                    loss_dict['l_frame_RL'] = l_frame_RL
+            pred_delta = self.net(self.tokens, decode=True)
+            l_frame_LR = self.cri_frame(
+                pred_delta, torch.zeros_like(pred_delta))
+            l_total += l_frame_LR
+            loss_dict['l_frame_LR'] = l_frame_LR
+
+            pred_delta = self.net(self.tokens.flip(1), decode=True)
+            l_frame_RL = self.cri_frame(
+                pred_delta, torch.zeros_like(pred_delta))
+            l_total += l_frame_RL
+            loss_dict['l_frame_RL'] = l_frame_RL
 
         self.scaler.scale(l_total).backward()
         self.scaler.unscale_(self.optimizer)
@@ -183,7 +170,7 @@ class AnimalModel(BaseModel):
     def test(self):
         self.net.eval()
         with torch.no_grad():
-            self.output = self.net(self.tokens, self.mask, self.pos)
+            self.output = self.net(self.tokens)
         self.net.train()
 
     def dist_validation(self, dataloader, current_iter, tb_logger):
@@ -204,10 +191,12 @@ class AnimalModel(BaseModel):
             # del self.output
             # torch.cuda.empty_cache()
 
-            feat = self.output['feat_LR']
+            feat = self.output
+            print(1, feat.shape)
             feat = feat.view(-1, feat.shape[-1])
             feats.append(feat)
             label = self.labels
+            print(2, label.shape)
             label = label.reshape(-1, label.shape[-1])
             labels.append(label)
 
