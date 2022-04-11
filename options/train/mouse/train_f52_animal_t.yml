@@ -1,5 +1,5 @@
 # general settings
-name: train_f52_animal_t
+name: train_f52_animal_t_f1
 model_type: AnimalModel
 num_gpu: 1
 manual_seed: 0

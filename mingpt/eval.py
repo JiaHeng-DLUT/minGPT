@@ -66,7 +66,7 @@ def train(seed, subtask, data, model, optimizer):
         (acc, P, R, f1, mP) = val_test(subtask, val_data, model)
         # logger.info(
         #     f'Epoch: {e + 1}, ACC: {acc:.5f}, P: {P:.5f}, R: {R:.5f}, F1: {f1:.5f}, mP: {mP:.5f}')
-        metric = mP
+        metric = f1
         if metric > best_metric:
             best_metric = metric
             best_state_dict = copy.deepcopy(model.state_dict())
@@ -162,7 +162,7 @@ class Evaluator:
                     subtask, data['test'], self.model)
                 logger.info(
                     f'Seed: {seed}, Subtask: {subtask}, ACC: {acc:.5f}, P: {P:.5f}, R: {R:.5f}, F1: {f1:.5f}, mP: {mP:.5f}')
-                result[seed, subtask] = mP
+                result[seed, subtask] = f1
 
         logger.info(result)
         logger.info(f'ave: {result.mean().item()}, {result.mean(dim=0)}')
