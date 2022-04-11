@@ -40,9 +40,9 @@ class TesterConfig:
     # ckpt_path = f'./experiments/fly/41_lr_1e-5_194/epoch23.pth'
     # ckpt_path = f'./experiments/fly/43_lr_regression_bs32_lr_1e-5/epoch9.pth'
     # ckpt_path = f'./experiments/fly/44_lr_regression_bs32_lr_1e-6/epoch15.pth'
-    ckpt_path = f'./experiments/fly/45_lr_regression_lr_cosine/epoch17.pth'
+    ckpt_path = f'./experiments/fly/59_tanh_test/epoch9.pth'
     feat_path = ckpt_path.replace('.pth', '_submission.npy')
-    # CUDA_VISIBLE_DEVICES=3 python test_fly.py
+    # CUDA_VISIBLE_DEVICES=1 python test_fly.py
 
     def __init__(self, **kwargs):
         for k,v in kwargs.items():
@@ -100,7 +100,12 @@ def validate_submission(submission, submission_clips):
 class Tester:
 
     def __init__(self, model, test_dataset, config):
-        model.load_state_dict(torch.load(config.ckpt_path))
+        state_dict = torch.load(config.ckpt_path)
+        for k in state_dict:
+            if k.endswith('mask'):
+                print(k)
+                state_dict[k] = torch.ones_like(state_dict[k])
+        model.load_state_dict(state_dict)
         self.model = model
         self.test_dataset = test_dataset
         self.config = config
@@ -138,7 +143,8 @@ class Tester:
                 frame_number_map[id] = (st, ed)
             # forward the model
             with torch.set_grad_enabled(is_train):
-                feat = model(x, pos, y=None).view(-1, self.config.output_dim).cpu()
+                feat, _ = model(x, pos, y=None)
+                feat = feat.view(-1, self.config.output_dim).cpu()
             feats.append(feat)
         feats = torch.cat(feats, dim=0).numpy()
         # print(1, feats.shape)

@@ -14,8 +14,11 @@ class fly_aug_dataset_2(data.Dataset):
         data_path = opt['data_path']
         meta_path = opt['meta_path']
 
-        data = np.load(data_path, allow_pickle=True).item()
-        self.seqs = data['sequences']
+        data = {}
+        for path in data_path:
+            seq = np.load(path, allow_pickle=True).item()['sequences']
+            data = {**data, **seq}
+        self.seqs = data
 
         id_list = open(meta_path).readlines()
         self.id_list = [id.strip() for id in id_list]
@@ -102,7 +105,7 @@ class fly_aug_dataset_2(data.Dataset):
         keypoints = torch.nan_to_num(keypoints, nan=0)
         ret.update({'keypoints': keypoints})
 
-        if 'annotations' in self.seqs[id]:
+        if self.opt['val']:
             labels = torch.from_numpy(self.seqs[id]['annotations'][:, pos : pos + self.num_frame])
             labels = torch.nan_to_num(labels, nan=-100)
             ret.update({'labels': labels})

@@ -204,9 +204,6 @@ class GPT(nn.Module):
         x = self.ln_f(x)
         x = self.proj(x)        #(b, num_tokens, output_dim)
 
-        if y is None:
-            return x
-
         # logits1 = self.head1(x).view(-1, 2) #(b * num_tokens, 2)
         # logits2 = self.head2(x).view(-1, 2)
         # logits3 = self.head3(x).view(-1, 2)
