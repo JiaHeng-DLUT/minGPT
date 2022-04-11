@@ -94,7 +94,7 @@ def main():
         for val_data in tqdm(test_loader):
             model.feed_data(val_data)
             model.test()
-            feat = model.output['feat_LR']
+            feat = model.output
             feat = feat.view(-1, feat.shape[-1])
             feats.append(feat)
         feats = torch.cat(feats, dim=0).cpu().numpy()
