@@ -42,6 +42,11 @@ class AnimalModel(BaseModel):
         self.scaler = GradScaler()
 
     def init_training_settings(self):
+        self.net_ema = define_network(deepcopy(self.opt['network']))
+        self.net_ema = self.model_to_device(self.net_ema)
+        self.model_ema(0)
+        self.net_ema.eval()
+
         self.net.train()
         train_opt = self.opt['train']
 
@@ -165,12 +170,13 @@ class AnimalModel(BaseModel):
         self.scaler.step(self.optimizer)
         self.scaler.update()
 
+        self.model_ema(decay=0.5)
         self.log_dict = self.reduce_loss_dict(loss_dict)
 
     def test(self):
         self.net.eval()
         with torch.no_grad():
-            self.output = self.net(self.tokens)
+            self.output = self.net_ema(self.tokens)
         self.net.train()
 
     def dist_validation(self, dataloader, current_iter, tb_logger):
@@ -216,5 +222,14 @@ class AnimalModel(BaseModel):
         #     tb_logger.add_scalar('metric', metric, current_iter)
 
     def save(self, epoch, current_iter):
-        self.save_network(self.net, 'net', current_iter)
+        self.save_network(self.net_ema, 'net', current_iter)
         # self.save_training_state(epoch, current_iter)
+
+    def model_ema(self, decay=0.999):
+        net = self.get_bare_model(self.net)
+
+        net_params = dict(net.named_parameters())
+        net_ema_params = dict(self.net_ema.named_parameters())
+
+        for k in net_ema_params.keys():
+            net_ema_params[k].data.mul_(decay).add_(net_params[k].data, alpha=1 - decay)
